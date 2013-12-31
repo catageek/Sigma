@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 
 #include "systems/OpenGLSystem.h"
 #include "systems/OpenALSystem.h"
@@ -80,7 +81,7 @@ int main(int argCount, char **argValues) {
     std::cout << "Initializing OpenAL system." << std::endl;
     alsys.Start();
     alsys.test(); // try sound
-	
+
 	////////////////
 	// Load scene //
 	////////////////
@@ -159,7 +160,7 @@ int main(int argCount, char **argValues) {
 		Sigma::event::handler::GLSixDOFViewController cameraController(glsys.GetView(), mover);
 		glfwos.RegisterKeyboardEventHandler(&cameraController);
 	}
-	
+
 	// Sync bullet physics object with gl camera
 	bphys.initViewMover();
 
@@ -182,7 +183,7 @@ int main(int argCount, char **argValues) {
 
 	glfwos.RegisterKeyboardEventHandler(&guicon3);
 	glfwos.RegisterMouseEventHandler(&guicon3);
-	
+
 	// Call now to clear the delta after startup.
 	glfwos.GetDeltaTime();
 
@@ -202,12 +203,27 @@ int main(int argCount, char **argValues) {
 
 	FlashlightState fs = FL_OFF;
 
+    // Prepare the benchmark variables
+    using namespace std::chrono;
+    duration<double> time_bphys;
+    duration<double> time_glsys;
+    unsigned int benchcount = 0;
+
 	while (!glfwos.Closing()) {
+        // 100 iterations before displaing the benchmark values
+        if (++benchcount == 100) {
+            std::cout << time_bphys.count() << " seconds spent in bphys update" << std::endl;
+            std::cout << time_glsys.count() << " seconds spent in glsys update" << std::endl;
+            time_bphys = std::chrono::duration<double>::zero();
+            time_glsys = std::chrono::duration<double>::zero();
+            benchcount = 0;
+        }
+
 		// Get time in ms, store it in seconds too
 		double deltaSec = glfwos.GetDeltaTime();
 
 		// Process input
-		if(glfwos.CheckKeyState(Sigma::event::KS_DOWN, GLFW_KEY_F)) {			
+		if(glfwos.CheckKeyState(Sigma::event::KS_DOWN, GLFW_KEY_F)) {
 			if(fs==FL_OFF) {
 				fs=FL_TURNING_ON;
 			} else if (fs==FL_ON) {
@@ -238,7 +254,11 @@ int main(int argCount, char **argValues) {
 		///////////////////////
 
 		// Pass in delta time in seconds
+        steady_clock::time_point t1 = steady_clock::now();
 		bphys.Update(deltaSec);
+        steady_clock::time_point t2 = steady_clock::now();
+        time_bphys += duration_cast<duration<double>>(t2 - t1);
+
 		webguisys.Update(deltaSec);
 
 		alsys.Update();
@@ -249,9 +269,12 @@ int main(int argCount, char **argValues) {
 		//fbos[1] = glsys.getRenderTarget(lightBuffer);
 
 		// Update the renderer and present
+        t1 = steady_clock::now();
 		if (glsys.Update(deltaSec)) {
 			glfwos.SwapBuffers();
 		}
+        t2 = steady_clock::now();
+        time_glsys += duration_cast<duration<double>>(t2 - t1);
 
 		glfwos.OSMessageLoop();
 	}
