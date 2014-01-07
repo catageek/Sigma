@@ -16,7 +16,8 @@ file(GLOB SigmaTests_SRC "tests/*.h" "main.cpp")
 file(GLOB SigmaTests_SRC_CPP
     "${CMAKE_SOURCE_DIR}/src/EntityManager.cpp" 
     "${CMAKE_SOURCE_DIR}/src/components/BitArray.cpp"
-    "${CMAKE_SOURCE_DIR}/src/systems/FactorySystem.cpp" 
+    "${CMAKE_SOURCE_DIR}/src/UniqueIDProvider.cpp"
+    "${CMAKE_SOURCE_DIR}/src/systems/FactorySystem.cpp"
     # add other cpp dependencies here
     )
 source_group("Source Files" FILES ${Sigma_SRC_COMPONENT_CPP})

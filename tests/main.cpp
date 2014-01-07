@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 #include "tests/BitArrayTest.h"
 #include "tests/VectorMapTest.h"
+#include "tests/UniqueIDProviderTest.h"
 #include "tests/PropertyTest.h"
 
 int main(int argc, char **argv) {
