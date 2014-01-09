@@ -1,5 +1,4 @@
 #include <iostream>
-#include <chrono>
 
 #include "systems/OpenGLSystem.h"
 #include "systems/OpenALSystem.h"
@@ -14,6 +13,7 @@
 #include "systems/WebGUISystem.h"
 #include "OS.h"
 #include "components/SpotLight.h"
+#include "PerfMetrics.h"
 
 int main(int argCount, char **argValues) {
 	Sigma::OS glfwos;
@@ -203,22 +203,11 @@ int main(int argCount, char **argValues) {
 
 	FlashlightState fs = FL_OFF;
 
-	// Prepare the benchmark variables
-	using namespace std::chrono;
-	duration<double> time_bphys;
-	duration<double> time_glsys;
-	unsigned int benchcount = 0;
+	// Prepare the metrics
+	auto pmetrics = PerfMetrics("Physics");
+	auto gmetrics = PerfMetrics("Render");
 
 	while (!glfwos.Closing()) {
-		// 100 iterations before displaing the benchmark values
-		if (++benchcount == 100) {
-			std::cout << time_bphys.count() << " seconds spent in bphys update" << std::endl;
-			std::cout << time_glsys.count() << " seconds spent in glsys update" << std::endl;
-			time_bphys = std::chrono::duration<double>::zero();
-			time_glsys = std::chrono::duration<double>::zero();
-			benchcount = 0;
-		}
-
 		// Get time in ms, store it in seconds too
 		double deltaSec = glfwos.GetDeltaTime();
 
@@ -254,10 +243,9 @@ int main(int argCount, char **argValues) {
 		///////////////////////
 
 		// Pass in delta time in seconds
-		steady_clock::time_point t1 = steady_clock::now();
+		pmetrics.start();
 		bphys.Update(deltaSec);
-		steady_clock::time_point t2 = steady_clock::now();
-		time_bphys += duration_cast<duration<double>>(t2 - t1);
+		pmetrics.stop();
 
 		webguisys.Update(deltaSec);
 
@@ -269,15 +257,16 @@ int main(int argCount, char **argValues) {
 		//fbos[1] = glsys.getRenderTarget(lightBuffer);
 
 		// Update the renderer and present
-		t1 = steady_clock::now();
+		gmetrics.start();
 		if (glsys.Update(deltaSec)) {
 			glfwos.SwapBuffers();
 		}
-		t2 = steady_clock::now();
-		time_glsys += duration_cast<duration<double>>(t2 - t1);
+		gmetrics.stop();
 
 		glfwos.OSMessageLoop();
 	}
-
+	pmetrics.displayMeantime();
+	gmetrics.displayMeantime();
+	gmetrics.displayTotalRuntime();
 	return 0;
 }
