@@ -16,7 +16,7 @@ public:
 
 	void stop() {
 		steady_clock::time_point stop = steady_clock::now();
-		duration_sum += duration_cast<duration<double>>(stop - last_clock).count();
+		duration_sum += duration_cast<microseconds>(stop - last_clock);
 		count++;
 	}
 
@@ -26,20 +26,22 @@ public:
 
 	void displayTotalRuntime() const {
 		steady_clock::time_point stop = steady_clock::now();
-		double time = duration_cast<duration<double>>(stop - initial).count();
-		std::cout << ((double) count) / time << " FPS" << std::endl;
+		microseconds time = duration_cast<microseconds>(stop - initial);
+		std::cout << "time of execution: " << (double) time.count() / 1.0E6 << " seconds" << std::endl;
+		std::cout << "number of iterations: " << count << std::endl;
+		std::cout << ((double) count) * 1E6 / time.count() << " FPS" << std::endl;
 	}
 
 private:
 
 	double mean() const {
-		return duration_sum / count;
+		return (double) duration_sum.count() / count / 1E6;
 	}
 
 	unsigned int count;
 	steady_clock::time_point initial;
 	steady_clock::time_point last_clock;
-	double duration_sum;
+	microseconds duration_sum;
 	std::string name;
 };
 
