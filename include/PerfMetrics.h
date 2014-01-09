@@ -8,7 +8,7 @@ using namespace std::chrono;
 
 class PerfMetrics {
 public:
-	PerfMetrics(const std::string& name) : name(name), initial(steady_clock::now()) {};
+	PerfMetrics(const std::string& name) : name(name), duration_sum(0), count(0), initial(steady_clock::now()) {};
 
 	void start() {
 		last_clock = steady_clock::now();
@@ -16,7 +16,8 @@ public:
 
 	void stop() {
 		steady_clock::time_point stop = steady_clock::now();
-		duration_vect.push_back(duration_cast<duration<double>>(stop - last_clock).count());
+		duration_sum += duration_cast<duration<double>>(stop - last_clock).count();
+		count++;
 	}
 
 	void displayMeantime() {
@@ -25,26 +26,20 @@ public:
 
 	void displayTotalRuntime() const {
 		steady_clock::time_point stop = steady_clock::now();
-		auto time = duration_cast<duration<double>>(stop - initial).count();
-		std::cout << ((double) duration_vect.size()) / time << " FPS" << std::endl;
+		double time = duration_cast<duration<double>>(stop - initial).count();
+		std::cout << ((double) count) / time << " FPS" << std::endl;
 	}
 
 private:
-	double sum() const {
-		double sum = 0;
-		for (auto itr = duration_vect.cbegin(); itr != duration_vect.cend(); itr++) {
-			sum += *itr;
-		}
-		return sum;
-	}
 
 	double mean() const {
-		return sum() / duration_vect.size();
+		return duration_sum / count;
 	}
 
+	unsigned int count;
 	steady_clock::time_point initial;
 	steady_clock::time_point last_clock;
-	std::vector<double> duration_vect;
+	double duration_sum;
 	std::string name;
 };
 
