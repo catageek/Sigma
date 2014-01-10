@@ -22,6 +22,7 @@ public:
 
 	void displayMeantime() {
 		std::cout <<  mean() * 100 << " seconds for 100 iterations for metrics " << name << std::endl;
+		std::cout << "At 60 fps, " << name << " pipeline would take " << mean() * 6000 << "% of each frame" << std::endl;
 	}
 
 	void displayTotalRuntime() const {
@@ -29,13 +30,17 @@ public:
 		microseconds time = duration_cast<microseconds>(stop - initial);
 		std::cout << "time of execution: " << (double) time.count() / 1.0E6 << " seconds" << std::endl;
 		std::cout << "number of iterations: " << count << std::endl;
-		std::cout << ((double) count) * 1E6 / time.count() << " FPS" << std::endl;
+		std::cout << FPS(time) << " FPS" << std::endl;
 	}
 
 private:
 
 	double mean() const {
 		return (double) duration_sum.count() / count / 1E6;
+	}
+
+	unsigned int FPS(microseconds time) const {
+		return count * 1E6 / time.count();
 	}
 
 	unsigned int count;
