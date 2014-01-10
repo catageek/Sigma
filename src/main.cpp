@@ -206,6 +206,8 @@ int main(int argCount, char **argValues) {
 	// Prepare the metrics
 	auto pmetrics = PerfMetrics("Physics");
 	auto gmetrics = PerfMetrics("Render");
+	auto ametrics = PerfMetrics("Audio");
+	auto guimetrics = PerfMetrics("GUI");
 
 	while (!glfwos.Closing()) {
 		// Get time in ms, store it in seconds too
@@ -247,9 +249,13 @@ int main(int argCount, char **argValues) {
 		bphys.Update(deltaSec);
 		pmetrics.stop();
 
+		guimetrics.start();
 		webguisys.Update(deltaSec);
+		guimetrics.stop();
 
+		ametrics.start();
 		alsys.Update();
+		ametrics.stop();
 
 		// Framebuffer(s) to draw
 		//int fbos[2];
@@ -267,6 +273,8 @@ int main(int argCount, char **argValues) {
 	}
 	pmetrics.displayMeantime();
 	gmetrics.displayMeantime();
+	ametrics.displayMeantime();
+	guimetrics.displayMeantime();
 	gmetrics.displayTotalRuntime();
 	return 0;
 }
