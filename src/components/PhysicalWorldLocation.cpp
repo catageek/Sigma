@@ -9,10 +9,9 @@ namespace Sigma {
     std::unordered_map<id_t, std::shared_ptr<GLTransform>> PhysicalWorldLocation::transform_ptr_map;
 
     void PhysicalWorldLocation::UpdateTransform() {
-    	auto it = GetIteratorUpdatedID();
-        for (auto it = GetIteratorUpdatedID(); **it < GetUpdatedSize(); ++(*it)) {
-            auto position = getPosition(**it);
-            auto transform = GetTransform(**it);
+        for (auto it = GetIteratorUpdatedID(); *it < GetUpdatedSize(); ++it) {
+            auto position = getPosition(*it);
+            auto transform = GetTransform(*it);
             if (transform) {
 				transform->TranslateTo(position->x, position->y, position->z);
             }
