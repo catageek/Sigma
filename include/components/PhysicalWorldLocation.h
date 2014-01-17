@@ -111,7 +111,7 @@ namespace Sigma {
 		 */
 		static inline void ClearUpdatedSet() { updated_set = BitArray<unsigned int>::Create(); };
 
-		static inline std::unique_ptr<BitArrayIterator<unsigned int>> GetIteratorUpdatedID() {
+		static inline BitArrayIterator<unsigned int> GetIteratorUpdatedID() {
 			return updated_set->iterator();
 		};
 
