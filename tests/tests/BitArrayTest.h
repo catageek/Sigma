@@ -166,32 +166,32 @@ namespace Sigma {
 	TEST(BitArrayTest, BitArrayIterator) {
 		auto bit_array = BitArray<unsigned int>::Create((size_t) 576); //576 bits
 		auto it = bit_array->iterator();
-		ASSERT_LE(576, ++*it) << "it++ should return size when BitArray is empty";
+		ASSERT_LE(576, *(++it)) << "it++ should return size when BitArray is empty";
 		(*bit_array)[0] = true;
 		it = bit_array->iterator();
-		ASSERT_EQ(0, **it) << "it++ should return 0";
+		ASSERT_EQ(0, *it) << "it++ should return 0";
 		(*bit_array)[1] = true;
-		ASSERT_EQ(1, ++*it) << "it++ should return 1";
+		ASSERT_EQ(1, *(++it)) << "it++ should return 1";
 		(*bit_array)[15] = true;
-		ASSERT_EQ(15, ++*it) << "it++ should return 15";
+		ASSERT_EQ(15, *(++it)) << "it++ should return 15";
 		(*bit_array)[63] = true;
-		ASSERT_EQ(63, ++*it) << "it++ should return 63";
+		ASSERT_EQ(63, *(++it)) << "it++ should return 63";
 		(*bit_array)[64] = true;
-		ASSERT_EQ(64, ++*it) << "it++ should return 64";
+		ASSERT_EQ(64, *(++it)) << "it++ should return 64";
 		(*bit_array)[65] = true;
-		ASSERT_EQ(65, ++*it) << "it++ should return 65";
+		ASSERT_EQ(65, *(++it)) << "it++ should return 65";
 		(*bit_array)[300] = true;
-		ASSERT_EQ(300, ++*it) << "it++ should return 300";
+		ASSERT_EQ(300, *(++it)) << "it++ should return 300";
 		(*bit_array)[574] = true;
-		ASSERT_EQ(574, ++*it) << "it++ should return 574";
+		ASSERT_EQ(574, *(++it)) << "it++ should return 574";
 		(*bit_array)[575] = true;
-		ASSERT_EQ(575, ++*it) << "it++ should return 575";
-		ASSERT_LE(576, ++*it) << "it++ should return size";
+		ASSERT_EQ(575, *(++it)) << "it++ should return 575";
+		ASSERT_LE(576, *(++it)) << "it++ should return size";
 
 		bit_array = BitArray<unsigned int>::Create((size_t) 576); //576 bits
 		(*bit_array)[1] = true;
 		it = bit_array->iterator();
-		ASSERT_EQ(1, **it) << "it++ should return 1";
+		ASSERT_EQ(1, *it) << "it++ should return 1";
 	}
 }
 

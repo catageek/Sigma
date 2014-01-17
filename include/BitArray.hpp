@@ -249,8 +249,8 @@ namespace Sigma {
 			return bitarray.data();
 		}
 
-		std::unique_ptr<BitArrayIterator<T>> iterator() {
-			return std::unique_ptr<BitArrayIterator<T>>(new BitArrayIterator<T>(this->shared_from_this()));
+		BitArrayIterator<T> iterator() {
+			return BitArrayIterator<T>(this->shared_from_this());
 		};
 
 		const size_t count() const {
@@ -311,7 +311,8 @@ namespace Sigma {
 			current_long((unsigned long long*) bs->data()), last_bit(0), current_value(-1) { ++(*this); };
 		virtual ~BitArrayIterator() {};
 
-		size_t& operator++() {
+		// pre-increment
+		BitArrayIterator& operator++() {
 			auto length = bitarray->size();
 			auto end = (unsigned long long*) bitarray->data() + (ROUND_DOWN(bitarray->size(), 64) >> 6);
 			for (current_value++; current_long < end ; current_long++) {
@@ -320,7 +321,7 @@ namespace Sigma {
 					if (__builtin_popcountll(tmp)) {
 						last_bit += __builtin_ctzll(tmp);
 						current_value = last_bit++ + ((current_long - start) << 6);
-						return current_value;
+						return *this;
 					}
 				}
 				else {
@@ -329,11 +330,11 @@ namespace Sigma {
 			}
 			for (; current_value < length; ++current_value) {
 				if ((*bitarray)[current_value]) {
-					return current_value;
+					return *this;
 				}
 			}
 			current_value = length;
-			return current_value;
+			return *this;
 		};
 
 		const size_t &operator*() const {
@@ -341,6 +342,9 @@ namespace Sigma {
 		}
 
 	private:
+		//post-increment is disabled
+		BitArrayIterator operator++(int i) {};
+
 		int last_bit;
 		unsigned long long* current_long;
 		const unsigned long long* const start = current_long;
@@ -356,7 +360,8 @@ namespace Sigma {
 			current_int((unsigned int*) bs->data()), last_bit(0), current_value(-1), start(current_int) { ++(*this); };
 		virtual ~BitArrayIterator() {};
 
-		size_t& operator++() {
+		// pre-increment
+		BitArrayIterator& operator++() {
 			auto length = bitarray->size();
 			auto end = (unsigned int*) bitarray->data() + (ROUND_DOWN(bitarray->size(), 32) >> 5);
 			for (current_value++; current_int < end; current_int++) {
@@ -367,7 +372,7 @@ namespace Sigma {
 						_BitScanForward(&ret, tmp);
 						last_bit += ret;
 						current_value = last_bit++ + ((current_int - start) << 5);
-						return current_value;
+						return *this;
 					}
 				}
 				else {
@@ -376,11 +381,11 @@ namespace Sigma {
 			}
 			for (; current_value < length; ++current_value) {
 				if ((*bitarray)[current_value]) {
-					return current_value;
+					return *this;
 				}
 			}
 			current_value = length;
-			return current_value;
+			return *this;
 		};
 
 		const size_t &operator*() const {
@@ -388,6 +393,9 @@ namespace Sigma {
 		}
 
 	private:
+		//post-increment is disabled
+		BitArrayIterator operator++(int i) {};
+
 		unsigned char last_bit;
 		unsigned int* current_int;
 		const unsigned int* const start;
@@ -401,15 +409,16 @@ namespace Sigma {
 		BitArrayIterator(std::shared_ptr<BitArray<T>> bs) : bitarray(bs), current_value(-1) { ++(*this); };
 		virtual ~BitArrayIterator() {};
 
-		size_t& operator++() {
+		// pre-increment
+		BitArrayIterator& operator++() {
 			auto length = bitarray->size();
 			for (current_value++; current_value < length; ++current_value) {
 				if ((*bitarray)[current_value]) {
-					return current_value;
+					return *this;
 				}
 			}
 			current_value = length;
-			return current_value;
+			return *this;
 		};
 
 		const size_t &operator*() const {
@@ -417,6 +426,9 @@ namespace Sigma {
 		}
 
 	private:
+		//post-increment is disabled
+		BitArrayIterator operator++(int i) {};
+
 		const unsigned long long* const start = current_long;
 		std::shared_ptr<BitArray<T>> bitarray;
 		size_t current_value;
