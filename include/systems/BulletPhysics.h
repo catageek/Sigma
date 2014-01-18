@@ -50,6 +50,10 @@ namespace Sigma {
 			return this->mover;
 		}
 
+
+		DLL_EXPORT btDiscreteDynamicsWorld* getBulletWorld() { return dynamicsWorld; }
+
+
 		std::map<std::string,IFactory::FactoryFunction> getFactoryFunctions();
 		std::map<std::string,IECSFactory::FactoryFunction> getECSFactoryFunctions();
 
