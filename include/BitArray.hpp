@@ -241,17 +241,18 @@ namespace Sigma {
 			return reference<T>(bitarray[offset], bit_id);
 		}
 
+		// number of bits stored
 		const size_t size() const {
 			return bsize;
 		}
 
+		// iterators
+		BitArrayIterator<T> begin() { return iterator(-1); };
+		BitArrayIterator<T> end() { return iterator(size()); };
+
 		const T* data() const {
 			return bitarray.data();
 		}
-
-		BitArrayIterator<T> iterator() {
-			return BitArrayIterator<T>(this->shared_from_this());
-		};
 
 		const size_t count() const {
 			size_t sum = 0;
@@ -296,6 +297,10 @@ namespace Sigma {
 			bitarray.assign(bitarray.size(), this->def_value);
 		};
 
+		BitArrayIterator<T> iterator(size_t index) {
+			return BitArrayIterator<T>(this->shared_from_this(), index);
+		};
+
 		std::vector<T> bitarray;
 //		std::vector<T, AlignedVectorAllocator<T>> bitarray;
 		size_t bsize;
@@ -307,8 +312,8 @@ namespace Sigma {
 	template<class T>
 	class BitArrayIterator {
 	public:
-		BitArrayIterator(std::shared_ptr<BitArray<T>> bs) : bitarray(bs),\
-			current_long((unsigned long long*) bs->data()), last_bit(0), current_value(-1) { ++(*this); };
+		BitArrayIterator(std::shared_ptr<BitArray<T>> bs, size_t index) : bitarray(bs),\
+			current_long((unsigned long long*) bs->data()), last_bit(0), current_value(index) { ++(*this); };
 		virtual ~BitArrayIterator() {};
 
 		// pre-increment
@@ -335,6 +340,15 @@ namespace Sigma {
 			}
 			current_value = length;
 			return *this;
+		};
+
+		// comparison
+		bool operator==(const BitArrayIterator& other) {
+			return this->bitarray.get() == other.bitarray.get() && this->current_value == other.current_value;
+		};
+
+		bool operator!=(const BitArrayIterator& other) {
+			return ! (*this == other);
 		};
 
 		const size_t &operator*() const {
@@ -388,6 +402,15 @@ namespace Sigma {
 			return *this;
 		};
 
+		// comparison
+		bool operator==(const BitArrayIterator& lhs, const BitArrayIterator& rhs) {
+			return lhs.bitarray.get() == rhs.bitarray.get() && lhs.current_value == rhs.current_value;
+		}
+
+		bool operator!=(const BitArrayIterator& lhs, const BitArrayIterator& rhs) {
+			return ! (lhs == rhs);
+		}
+
 		const size_t &operator*() const {
 			return current_value;
 		}
@@ -420,6 +443,15 @@ namespace Sigma {
 			current_value = length;
 			return *this;
 		};
+
+		// comparison
+		bool operator==(const BitArrayIterator& lhs, const BitArrayIterator& rhs) {
+			return lhs.bitarray.get() == rhs.bitarray.get() && lhs.current_value == rhs.current_value;
+		}
+
+		bool operator!=(const BitArrayIterator& lhs, const BitArrayIterator& rhs) {
+			return ! (lhs == rhs);
+		}
 
 		const size_t &operator*() const {
 			return current_value;
