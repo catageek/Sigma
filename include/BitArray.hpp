@@ -232,10 +232,12 @@ namespace Sigma {
 
 		// left-side reference
 		reference<T> operator[](size_t idx) {
-			auto offset = idx / blocksize;
+			auto offset = idx / blocksize;	// calculate index of block
 			if (offset >= bitarray.size()) {
 					bitarray.resize(offset + 1, def_value);
-					bsize = idx + 1;
+			}
+			if (bsize <= idx) {
+				bsize = idx + 1;
 			}
 			auto bit_id = idx % blocksize;
 			return reference<T>(bitarray[offset], bit_id);
@@ -248,7 +250,7 @@ namespace Sigma {
 
 		// iterators
 		BitArrayIterator<T> begin() { return iterator(-1); };
-		BitArrayIterator<T> end() { return iterator(size()); };
+		BitArrayIterator<T> end() { return iterator(size() + 64); };
 
 		const T* data() const {
 			return bitarray.data();
@@ -303,7 +305,7 @@ namespace Sigma {
 
 		std::vector<T> bitarray;
 //		std::vector<T, AlignedVectorAllocator<T>> bitarray;
-		size_t bsize;
+		size_t bsize;	// the number of elements
 		T def_value;
 		const unsigned int blocksize;
 	};
@@ -313,7 +315,7 @@ namespace Sigma {
 	class BitArrayIterator {
 	public:
 		BitArrayIterator(std::shared_ptr<BitArray<T>> bs, size_t index) : bitarray(bs),\
-			current_long((unsigned long long*) bs->data()), last_bit(0), current_value(index) { ++(*this); };
+			current_long((unsigned long long*) bs->data() + (ROUND_DOWN(index, 64) >> 6)), last_bit(0), current_value(index) { ++(*this); };
 		virtual ~BitArrayIterator() {};
 
 		// pre-increment
