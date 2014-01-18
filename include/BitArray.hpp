@@ -315,13 +315,13 @@ namespace Sigma {
 	class BitArrayIterator {
 	public:
 		BitArrayIterator(std::shared_ptr<BitArray<T>> bs, size_t index) : bitarray(bs),\
-			current_long((unsigned long long*) bs->data() + (ROUND_DOWN(index, 64) >> 6)), last_bit(0), current_value(index) { ++(*this); };
+			current_long((unsigned long long*) bs->data() + (index >> 6)), last_bit(0), current_value(index) { ++(*this); };
 		virtual ~BitArrayIterator() {};
 
 		// pre-increment
 		BitArrayIterator& operator++() {
 			auto length = bitarray->size();
-			auto end = (unsigned long long*) bitarray->data() + (ROUND_DOWN(bitarray->size(), 64) >> 6);
+			auto end = (unsigned long long*) bitarray->data() + (bitarray->size() >> 6);
 			for (current_value++; current_long < end ; current_long++) {
 				if (*current_long && last_bit < 64) {
 					unsigned long long tmp = *current_long >> last_bit;
@@ -373,13 +373,13 @@ namespace Sigma {
 	class BitArrayIterator {
 	public:
 		BitArrayIterator(std::shared_ptr<BitArray<T>> bs) : bitarray(bs),\
-			current_int((unsigned int*) bs->data()), last_bit(0), current_value(-1), start(current_int) { ++(*this); };
+			current_int((unsigned int*) bs->data() + (index >> 5)), last_bit(0), current_value(-1), start(current_int) { ++(*this); };
 		virtual ~BitArrayIterator() {};
 
 		// pre-increment
 		BitArrayIterator& operator++() {
 			auto length = bitarray->size();
-			auto end = (unsigned int*) bitarray->data() + (ROUND_DOWN(bitarray->size(), 32) >> 5);
+			auto end = (unsigned int*) bitarray->data() + (bitarray->size() >> 5);
 			for (current_value++; current_int < end; current_int++) {
 				if (*current_int && last_bit < 32) {
 					unsigned int tmp = *current_int >> last_bit;
