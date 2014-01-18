@@ -13,6 +13,8 @@
 #include "systems/WebGUISystem.h"
 #include "OS.h"
 #include "components/SpotLight.h"
+#include "components/PhysicalWorldLocation.h"
+#include "Benchmark.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -38,6 +40,7 @@ int main(int argCount, char **argValues) {
 	Sigma::OpenGLSystem glsys;
 	Sigma::OpenALSystem alsys;
 	Sigma::BulletPhysics bphys;
+	Sigma::Benchmark *benchmark;
 
 	Sigma::FactorySystem& factory = Sigma::FactorySystem::getInstance();
 
@@ -88,6 +91,16 @@ int main(int argCount, char **argValues) {
 	///////////////////
 
 	bphys.Start();
+
+	// Adding the entities of the benchmark
+	if (argCount == 3) {
+		auto arg1 = argValues[1];
+		auto arg2 = atoi(argValues[2]);
+		if (std::string(arg1).compare("-b") == 0 && arg2 > 0) {
+			benchmark = new Sigma::Benchmark(arg2);
+			benchmark->CreateEntities(factory);
+		}
+	}
 
 	// Create hard coded entity ID #1
 	// position is hardcoded
@@ -191,7 +204,7 @@ int main(int argCount, char **argValues) {
 	glfwos.RegisterKeyboardEventHandler(&theCamera);
 	glfwos.RegisterMouseEventHandler(&theCamera);
 	theCamera.os = &glfwos;
-	
+
 
 	///////////////////
 	// Configure GUI //
@@ -249,6 +262,11 @@ int main(int argCount, char **argValues) {
 				// Disable flashlight
 				fs=FL_OFF;
 			}
+		}
+
+		// run the benchmark : move all entities
+		if(benchmark) {
+			benchmark->ApplyForces();
 		}
 
 		///////////////////////
