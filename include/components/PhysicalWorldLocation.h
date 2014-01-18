@@ -111,11 +111,13 @@ namespace Sigma {
 		 */
 		static inline void ClearUpdatedSet() { updated_set = BitArray<unsigned int>::Create(); };
 
-		static inline BitArrayIterator<unsigned int> GetIteratorUpdatedID() {
-			return updated_set->iterator();
+		static inline BitArrayIterator<unsigned int> begin_UpdatedID() {
+			return updated_set->begin();
 		};
 
-		static inline id_t GetUpdatedSize() { return updated_set->size(); }
+		static inline BitArrayIterator<unsigned int> end_UpdatedID() {
+			return updated_set->end();
+		};
 
 		static std::shared_ptr<GLTransform> GetTransform(const id_t id) {
 			auto itt = transform_ptr_map.find(id);

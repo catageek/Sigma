@@ -165,10 +165,10 @@ namespace Sigma {
 
 	TEST(BitArrayTest, BitArrayIterator) {
 		auto bit_array = BitArray<unsigned int>::Create((size_t) 576); //576 bits
-		auto it = bit_array->iterator();
+		auto it = bit_array->begin();
 		ASSERT_LE(576, *(++it)) << "it++ should return size when BitArray is empty";
 		(*bit_array)[0] = true;
-		it = bit_array->iterator();
+		it = bit_array->begin();
 		ASSERT_EQ(0, *it) << "it++ should return 0";
 		(*bit_array)[1] = true;
 		ASSERT_EQ(1, *(++it)) << "it++ should return 1";
@@ -190,7 +190,7 @@ namespace Sigma {
 
 		bit_array = BitArray<unsigned int>::Create((size_t) 576); //576 bits
 		(*bit_array)[1] = true;
-		it = bit_array->iterator();
+		it = bit_array->begin();
 		ASSERT_EQ(1, *it) << "it++ should return 1";
 	}
 }
