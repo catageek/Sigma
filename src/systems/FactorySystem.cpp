@@ -4,7 +4,7 @@ namespace Sigma{
 
 	std::shared_ptr<FactorySystem> FactorySystem::_instance;
 
-	FactorySystem::FactorySystem(){
+	FactorySystem::FactorySystem(CompositeSystem* cpsys) : cpsys(cpsys) {
 		// nothing to construct
 	}
 
@@ -15,9 +15,9 @@ namespace Sigma{
 	/**
 	 * \brief return or create the singleton instance
 	 */
-	FactorySystem& FactorySystem::getInstance(){
+	FactorySystem& FactorySystem::getInstance(CompositeSystem* cpsys){
 		if(!_instance){
-			FactorySystem::_instance.reset( new FactorySystem() );
+			FactorySystem::_instance.reset( new FactorySystem(cpsys) );
 		}
 		return *FactorySystem::_instance;
 	}
@@ -34,15 +34,17 @@ namespace Sigma{
 		}
 	}
 
-	std::vector<std::unique_ptr<IECSComponent>> FactorySystem::createECS(const std::string& type,
+	std::vector<std::unique_ptr<IECSComponent>> FactorySystem::createECS(const CompositeID& type,
 							const id_t entityID,
 							const std::vector<Property> &properties){
 		if(registeredECSFactoryFunctions.find(type) != registeredECSFactoryFunctions.end()){
-			std::cerr << "Creating ECS component of type: " << type << std::endl;
+			std::cerr << "Creating ECS composite of type: " << type << std::endl;
+			// register the composite for this entity
+			cpsys->AddEntity(entityID, type);
 			return registeredECSFactoryFunctions[type](entityID, properties);
 		}
 		else {
-			std::cerr << "Error: Couldn't find component: " << type << std::endl;
+			std::cerr << "Error: Couldn't find composite: " << type << std::endl;
 			return std::vector<std::unique_ptr<IECSComponent>>();
 		}
 	}
@@ -58,7 +60,7 @@ namespace Sigma{
 	void FactorySystem::register_ECSFactory(IECSFactory& Factory){
 		const auto& factoryfunctions = Factory.getECSFactoryFunctions();
 		for(auto FactoryFunc = factoryfunctions.begin(); FactoryFunc != factoryfunctions.end(); ++FactoryFunc){
-			std::cerr << "Registering ECS component factory of type: " << FactoryFunc->first << std::endl;
+			std::cerr << "Registering ECS composite factory of type: " << FactoryFunc->first << std::endl;
 			registeredECSFactoryFunctions[FactoryFunc->first]=FactoryFunc->second;
 		}
 	}

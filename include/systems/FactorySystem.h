@@ -8,11 +8,12 @@
 #include <unordered_map>
 #include <iostream>
 #include "Sigma.h"
+#include "systems/CompositeSystem.h"
 
 namespace Sigma {
 	class FactorySystem {
 		public:
-			DLL_EXPORT static FactorySystem& getInstance();
+			DLL_EXPORT static FactorySystem& getInstance(CompositeSystem* cpsys);
 			~FactorySystem();
 			/**
 			 * \brief Create a new components of a given type.
@@ -27,7 +28,7 @@ namespace Sigma {
 						const id_t entityID,
 						const std::vector<Property> &properties);
 
-			DLL_EXPORT std::vector<std::unique_ptr<IECSComponent>> createECS(const std::string& type,
+			DLL_EXPORT std::vector<std::unique_ptr<IECSComponent>> createECS(const CompositeID& type,
 							const id_t entityID,
 							const std::vector<Property> &properties);
 
@@ -51,7 +52,7 @@ namespace Sigma {
 		protected:
 		private:
 			// Hide all constructors and the assignment operator to enforce the singleton pattern
-			FactorySystem();
+			FactorySystem(CompositeSystem* cpsys);
 			FactorySystem(const FactorySystem& rhs);
 			FactorySystem& operator=(const FactorySystem& rhs);
 			// the singleton instance
@@ -61,6 +62,9 @@ namespace Sigma {
 
 			// the map of name-->factory for the ECS style components
 			std::unordered_map<std::string,IECSFactory::FactoryFunction> registeredECSFactoryFunctions;
+
+			// the composite system
+			CompositeSystem* cpsys;
 	}; // class FactorySystem
 
 } // namespace Sigma

@@ -4,6 +4,7 @@
 #include "systems/OpenALSystem.h"
 #include "systems/BulletPhysics.h"
 #include "systems/FactorySystem.h"
+#include "systems/CompositeSystem.h"
 #include "controllers/GUIController.h"
 #include "controllers/FPSCamera.h"
 #include "components/PhysicsController.h"
@@ -40,9 +41,10 @@ int main(int argCount, char **argValues) {
 	Sigma::OpenGLSystem glsys;
 	Sigma::OpenALSystem alsys;
 	Sigma::BulletPhysics bphys;
+	Sigma::CompositeSystem cpsys;
 	Sigma::Benchmark *benchmark;
 
-	Sigma::FactorySystem& factory = Sigma::FactorySystem::getInstance();
+	Sigma::FactorySystem& factory = Sigma::FactorySystem::getInstance(&cpsys);
 
 	// EntitySystem can add components
 	Sigma::EntitySystem entitySystem(&factory);
