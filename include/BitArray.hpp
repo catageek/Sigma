@@ -105,7 +105,7 @@ namespace Sigma {
 		// Default destructor
 		virtual ~BitArray() {};
 		// Copy constructor
-		BitArray(BitArray& ba) : blocksize(sizeof(T) << 3) {
+		BitArray(const BitArray& ba) : blocksize(sizeof(T) << 3) {
 			bitarray = ba.bitarray;
 			def_value = ba.def_value;
 		}
