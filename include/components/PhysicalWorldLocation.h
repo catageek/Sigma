@@ -109,7 +109,7 @@ namespace Sigma {
 		 * \return ClearUpdatedSet() { updated_set = BitArray<unsigned
 		 *
 		 */
-		static inline void ClearUpdatedSet() { updated_set = BitArray<unsigned int>::Create(); };
+		static inline void ClearUpdatedSet() { updated_set = std::move(std::unique_ptr<BitArray<unsigned int>>(new BitArray<unsigned int>())); };
 
 		static inline BitArrayIterator<unsigned int> begin_UpdatedID() {
 			return updated_set->begin();
@@ -126,19 +126,6 @@ namespace Sigma {
 			}
 			return nullptr;
 		}
-
-
-		// TODO : move to UserView component
-		/** \brief A function adding a viewer, i.e an entity that will render the world
-		 *
-		 * \param id const id_t the id of the entity
-		 * \param view_limit coordinate_type the distance view for this viewer
-		 *
-		 */
-		void AddViewer(const id_t id, coordinate_type view_limit) {
-			viewDistanceMap.insert(std::make_pair(id, view_limit));
-			viewBitsetMap.insert(std::make_pair(id, BitArray<unsigned short>::Create()));
-		};
 
 		// These functions are not used for the moment
 /*
@@ -177,17 +164,12 @@ namespace Sigma {
 	private:
 		static VectorMap<id_t, position_type> pphysical;
 		static VectorMap<id_t, orientation_type> ophysical;
-		static std::shared_ptr<BitArray<unsigned int>> updated_set;
+		static std::unique_ptr<BitArray<unsigned int>> updated_set;
 		static std::unordered_map<id_t, GLTransform> transform_map;
 		// we need this hack to keep a shared_ptr for each transform since SpatialComponent
 		// uses its own GLTransform or a shared one, so we must provide a shared_ptr
 		// TODO: SpatialComponent should be redefined (what is its purpose ?)
 		static std::unordered_map<id_t, std::shared_ptr<GLTransform>> transform_ptr_map;
-
-
-		// TODO : move to UserViewSystem
-		std::map<id_t, std::shared_ptr<BitArray<unsigned short>>> viewBitsetMap;
-		std::map<id_t, coordinate_type> viewDistanceMap;
 	};
 }
 #endif // PHYSICALWORLDLOCATION_H_INCLUDED
