@@ -4,7 +4,7 @@
 namespace Sigma {
 	VectorMap<id_t, position_type> PhysicalWorldLocation::pphysical;
 	VectorMap<id_t, orientation_type> PhysicalWorldLocation::ophysical;
-	std::shared_ptr<BitArray<unsigned int>> PhysicalWorldLocation::updated_set = BitArray<unsigned int>::Create();
+	std::unique_ptr<BitArray<unsigned int>> PhysicalWorldLocation::updated_set = std::move(std::unique_ptr<BitArray<unsigned int>>(new BitArray<unsigned int>()));
     std::unordered_map<id_t, GLTransform> PhysicalWorldLocation::transform_map;
     std::unordered_map<id_t, std::shared_ptr<GLTransform>> PhysicalWorldLocation::transform_ptr_map;
 
