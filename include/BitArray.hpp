@@ -83,29 +83,24 @@ namespace Sigma {
 	/** \brief A bitset like boost::dynamic_bitset
 	 */
 	template<class T>
-	class BitArray : public std::enable_shared_from_this<BitArray<T>> {
+	class BitArray {
 	public:
-		/** \brief Call the constructor of a BitArray
-		 *
-		 * \param args are forwarded to constructor
-		 * \return std::shared_ptr<BitArray> a shared_ptr on the BitArray
-		 *
-		 */
-		static std::shared_ptr<BitArray<T>> Create() {
-			return std::shared_ptr<BitArray<T>>(new BitArray<T>());
-		}
-
-		static std::shared_ptr<BitArray<T>> Create(const size_t s, const bool b) {
-			return std::shared_ptr<BitArray<T>>(new BitArray<T>(s, b));
-		}
-
-		static std::shared_ptr<BitArray<T>> Create(const size_t s) {
-			return std::shared_ptr<BitArray<T>>(new BitArray<T>(s));
-		}
-
-		static std::shared_ptr<BitArray<T>> Create(const bool b) {
-			return std::shared_ptr<BitArray<T>>(new BitArray<T>(b));
-		}
+		// Default constructor
+		BitArray() : bsize(0), def_value(0), blocksize(sizeof(T) << 3)  {};
+		// Constructor with default value
+		BitArray(const bool b) : bsize(0), def_value(b ? -1 : 0), blocksize(sizeof(T) << 3)  {};
+		// Constructor with initial size
+		BitArray(const size_t s) : bsize(s), def_value(0), blocksize(sizeof(T) << 3)  {
+			bitarray = std::vector<T>((s / blocksize) + 1);
+//			bitarray = std::vector<T, AlignedVectorAllocator<T>>((s / blocksize) + 1);
+			bitarray.assign(bitarray.size(), this->def_value);
+		};
+		// Constructor with initial size and default value
+		BitArray(const size_t s, const bool b) : bsize(s), def_value(b ? -1 : 0), blocksize(sizeof(T) << 3)  {
+			bitarray = std::vector<T>((s / blocksize) + 1);
+//			bitarray = std::vector<T, AlignedVectorAllocator<T>>((s / blocksize) + 1);
+			bitarray.assign(bitarray.size(), this->def_value);
+		};
 
 		// Default destructor
 		virtual ~BitArray() {};
@@ -282,25 +277,8 @@ namespace Sigma {
 		}
 
 	private:
-		// Default constructor
-		BitArray() : bsize(0), def_value(0), blocksize(sizeof(T) << 3)  {};
-		// Constructor with default value
-		BitArray(const bool b) : bsize(0), def_value(b ? -1 : 0), blocksize(sizeof(T) << 3)  {};
-		// Constructor with initial size
-		BitArray(const size_t s) : bsize(s), def_value(0), blocksize(sizeof(T) << 3)  {
-			bitarray = std::vector<T>((s / blocksize) + 1);
-//			bitarray = std::vector<T, AlignedVectorAllocator<T>>((s / blocksize) + 1);
-			bitarray.assign(bitarray.size(), this->def_value);
-		};
-		// Constructor with initial size and default value
-		BitArray(const size_t s, const bool b) : bsize(s), def_value(b ? -1 : 0), blocksize(sizeof(T) << 3)  {
-			bitarray = std::vector<T>((s / blocksize) + 1);
-//			bitarray = std::vector<T, AlignedVectorAllocator<T>>((s / blocksize) + 1);
-			bitarray.assign(bitarray.size(), this->def_value);
-		};
-
 		BitArrayIterator<T> iterator(size_t index) {
-			return BitArrayIterator<T>(this->shared_from_this(), index);
+			return BitArrayIterator<T>(this, index);
 		};
 
 		std::vector<T> bitarray;
@@ -314,7 +292,7 @@ namespace Sigma {
 	template<class T>
 	class BitArrayIterator {
 	public:
-		BitArrayIterator(std::shared_ptr<BitArray<T>> bs, size_t index) : bitarray(bs),\
+		BitArrayIterator(BitArray<T>* bs, size_t index) : bitarray(bs),\
 			current_long((unsigned long long*) bs->data() + (index >> 6)), last_bit(0), current_value(index) { ++(*this); };
 		virtual ~BitArrayIterator() {};
 
@@ -346,7 +324,7 @@ namespace Sigma {
 
 		// comparison
 		bool operator==(const BitArrayIterator& other) {
-			return this->bitarray.get() == other.bitarray.get() && this->current_value == other.current_value;
+			return this->bitarray == other.bitarray && this->current_value == other.current_value;
 		};
 
 		bool operator!=(const BitArrayIterator& other) {
@@ -364,7 +342,7 @@ namespace Sigma {
 		int last_bit;
 		unsigned long long* current_long;
 		const unsigned long long* const start = current_long;
-		std::shared_ptr<BitArray<T>> bitarray;
+		BitArray<T>* bitarray;
 		size_t current_value;
 	};
 
@@ -372,7 +350,7 @@ namespace Sigma {
 	template<class T>
 	class BitArrayIterator {
 	public:
-		BitArrayIterator(std::shared_ptr<BitArray<T>> bs) : bitarray(bs),\
+		BitArrayIterator(BitArray<T>* bs) : bitarray(bs),\
 			current_int((unsigned int*) bs->data() + (index >> 5)), last_bit(0), current_value(-1), start(current_int) { ++(*this); };
 		virtual ~BitArrayIterator() {};
 
@@ -406,7 +384,7 @@ namespace Sigma {
 
 		// comparison
 		bool operator==(const BitArrayIterator& lhs, const BitArrayIterator& rhs) {
-			return lhs.bitarray.get() == rhs.bitarray.get() && lhs.current_value == rhs.current_value;
+			return lhs.bitarray == rhs.bitarray && lhs.current_value == rhs.current_value;
 		}
 
 		bool operator!=(const BitArrayIterator& lhs, const BitArrayIterator& rhs) {
@@ -424,14 +402,14 @@ namespace Sigma {
 		unsigned char last_bit;
 		unsigned int* current_int;
 		const unsigned int* const start;
-		std::shared_ptr<BitArray<T>> bitarray;
+		BitArray<T>* bitarray;
 		size_t current_value;
 	};
 #else // other compilers : not optimized at all
 	template<class T>
 	class BitArrayIterator {
 	public:
-		BitArrayIterator(std::shared_ptr<BitArray<T>> bs) : bitarray(bs), current_value(-1) { ++(*this); };
+		BitArrayIterator(BitArray<T>* bs) : bitarray(bs), current_value(-1) { ++(*this); };
 		virtual ~BitArrayIterator() {};
 
 		// pre-increment
@@ -448,7 +426,7 @@ namespace Sigma {
 
 		// comparison
 		bool operator==(const BitArrayIterator& lhs, const BitArrayIterator& rhs) {
-			return lhs.bitarray.get() == rhs.bitarray.get() && lhs.current_value == rhs.current_value;
+			return lhs.bitarray == rhs.bitarray && lhs.current_value == rhs.current_value;
 		}
 
 		bool operator!=(const BitArrayIterator& lhs, const BitArrayIterator& rhs) {
@@ -464,7 +442,7 @@ namespace Sigma {
 		BitArrayIterator operator++(int i) {};
 
 		const unsigned long long* const start = current_long;
-		std::shared_ptr<BitArray<T>> bitarray;
+		BitArray<T>* bitarray;
 		size_t current_value;
 	};
 #endif
