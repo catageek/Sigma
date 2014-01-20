@@ -13,7 +13,10 @@ namespace Sigma {
 		DLL_EXPORT CompositeSystem() : factory(FactorySystem::getInstance(this)) {};
 		DLL_EXPORT virtual ~CompositeSystem() {};
 
-		DLL_EXPORT void AddEntity(id_t eid, CompositeID cid) {
+		DLL_EXPORT void AddEntity(CompositeID cid, id_t eid, const std::vector<Property> &properties) {
+			if (! factory.create(cid, eid, properties)) {
+				factory.createECS(cid, eid, properties);
+			};
 			suscribers.AddEntity(eid, cid);
 		}
 

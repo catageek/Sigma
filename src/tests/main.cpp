@@ -165,10 +165,7 @@ int main(int argCount, char **argValues) {
 					assert(0 && "Invalid entity id");
 				}
 			}
-
-			if (! factory->create(itr->type,e->id, const_cast<std::vector<Property>&>(itr->properties))) {
-				factory->createECS(itr->type,e->id, const_cast<std::vector<Property>&>(itr->properties));
-			};
+			cpsys.AddEntity(itr->type, e->id, const_cast<std::vector<Property>&>(itr->properties));
 		}
 	}
 

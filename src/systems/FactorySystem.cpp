@@ -40,8 +40,6 @@ namespace Sigma{
 							const std::vector<Property> &properties){
 		if(registeredECSFactoryFunctions.find(type) != registeredECSFactoryFunctions.end()){
 			std::cerr << "Creating ECS composite of type: " << type << std::endl;
-			// register the composite for this entity
-			cpsys->AddEntity(entityID, type);
 			return registeredECSFactoryFunctions[type](entityID, properties);
 		}
 		else {
