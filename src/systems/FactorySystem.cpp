@@ -1,4 +1,5 @@
 #include "systems/FactorySystem.h"
+#include "systems/CompositeSystem.h"
 
 namespace Sigma{
 

@@ -44,16 +44,16 @@ int main(int argCount, char **argValues) {
 	Sigma::CompositeSystem cpsys;
 	Sigma::Benchmark *benchmark;
 
-	Sigma::FactorySystem& factory = Sigma::FactorySystem::getInstance(&cpsys);
+	Sigma::FactorySystem* factory = cpsys.GetFactory();
 
 	// EntitySystem can add components
-	Sigma::EntitySystem entitySystem(&factory);
+	Sigma::EntitySystem entitySystem(factory);
 
-	factory.register_Factory(glsys);
-	factory.register_Factory(alsys);
-	factory.register_Factory(bphys);
-	factory.register_ECSFactory(bphys);
-	factory.register_Factory(webguisys);
+	factory->register_Factory(glsys);
+	factory->register_Factory(alsys);
+	factory->register_Factory(bphys);
+	factory->register_ECSFactory(bphys);
+	factory->register_Factory(webguisys);
 
 	if (!glfwos.InitializeWindow(1024, 768, "Sigma GLFW Test Window")) {
 		std::cerr << "Failed creating the window or context." << std::endl;
@@ -166,8 +166,8 @@ int main(int argCount, char **argValues) {
 				}
 			}
 
-			if (! factory.create(itr->type,e->id, const_cast<std::vector<Property>&>(itr->properties))) {
-				factory.createECS(itr->type,e->id, const_cast<std::vector<Property>&>(itr->properties));
+			if (! factory->create(itr->type,e->id, const_cast<std::vector<Property>&>(itr->properties))) {
+				factory->createECS(itr->type,e->id, const_cast<std::vector<Property>&>(itr->properties));
 			};
 		}
 	}

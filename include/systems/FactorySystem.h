@@ -8,9 +8,10 @@
 #include <unordered_map>
 #include <iostream>
 #include "Sigma.h"
-#include "systems/CompositeSystem.h"
 
 namespace Sigma {
+	class CompositeSystem;
+
 	class FactorySystem {
 		public:
 			DLL_EXPORT static FactorySystem& getInstance(CompositeSystem* cpsys);
