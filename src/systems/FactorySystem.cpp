@@ -5,7 +5,7 @@ namespace Sigma{
 
 	std::shared_ptr<FactorySystem> FactorySystem::_instance;
 
-	FactorySystem::FactorySystem(CompositeSystem* cpsys) : cpsys(cpsys) {
+	FactorySystem::FactorySystem() {
 		// nothing to construct
 	}
 
@@ -16,9 +16,9 @@ namespace Sigma{
 	/**
 	 * \brief return or create the singleton instance
 	 */
-	FactorySystem& FactorySystem::getInstance(CompositeSystem* cpsys){
+	FactorySystem& FactorySystem::getInstance(){
 		if(!_instance){
-			FactorySystem::_instance.reset( new FactorySystem(cpsys) );
+			FactorySystem::_instance.reset( new FactorySystem() );
 		}
 		return *FactorySystem::_instance;
 	}

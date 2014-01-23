@@ -11,12 +11,8 @@ namespace Sigma {
 			parent_child_map.insert(std::make_pair(parent, child));
 		};
 
-		std::multimap<ComponentID, ComponentID>::const_iterator GetChildrenIterator(ComponentID parent) const {
-			return parent_child_map.find(parent);
-		};
-
-		std::multimap<ComponentID, ComponentID>::const_iterator end() const {
-			return parent_child_map.end();
+		std::multimap<ComponentID, ComponentID>& map() {
+			return parent_child_map;
 		}
 
 	private:

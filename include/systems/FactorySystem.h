@@ -14,7 +14,7 @@ namespace Sigma {
 
 	class FactorySystem {
 		public:
-			DLL_EXPORT static FactorySystem& getInstance(CompositeSystem* cpsys);
+			DLL_EXPORT static FactorySystem& getInstance();
 			~FactorySystem();
 			/**
 			 * \brief Create a new components of a given type.
@@ -53,7 +53,7 @@ namespace Sigma {
 		protected:
 		private:
 			// Hide all constructors and the assignment operator to enforce the singleton pattern
-			FactorySystem(CompositeSystem* cpsys);
+			FactorySystem();
 			FactorySystem(const FactorySystem& rhs);
 			FactorySystem& operator=(const FactorySystem& rhs);
 			// the singleton instance
@@ -64,8 +64,6 @@ namespace Sigma {
 			// the map of name-->factory for the ECS style components
 			std::unordered_map<std::string,IECSFactory::FactoryFunction> registeredECSFactoryFunctions;
 
-			// the composite system
-			CompositeSystem* cpsys;
 	}; // class FactorySystem
 
 } // namespace Sigma

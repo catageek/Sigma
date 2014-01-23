@@ -25,6 +25,18 @@ public:
 		}
 	}
 
+	// Copy assignment
+	Property& operator=(const Property& other) {
+		this->name = other.name;
+		if (other.vholder != nullptr) {
+			this->vholder = other.vholder->Clone();
+		}
+		else {
+			this->vholder = nullptr;
+		}
+		return *this;
+	}
+
 	// Move
 	Property(Property&& other) : name(other.name), vholder(other.vholder) {
 		other.vholder = nullptr;
