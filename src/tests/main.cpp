@@ -100,7 +100,7 @@ int main(int argCount, char **argValues) {
 		auto arg2 = atoi(argValues[2]);
 		if (std::string(arg1).compare("-b") == 0 && arg2 > 0) {
 			benchmark = new Sigma::Benchmark(arg2);
-			benchmark->CreateEntities(&factory);
+			benchmark->CreateEntities(&cpsys);
 		}
 	}
 

@@ -4,7 +4,6 @@
 #include <random>
 #include <chrono>
 
-#include "systems/FactorySystem.h"
 #include "components/PhysicalWorldLocation.h"
 #include "components/ControllableMove.h"
 #include "components/RigidBody.h"
@@ -22,7 +21,7 @@ namespace Sigma {
 
 		virtual ~Benchmark() {};
 
-		void CreateEntities(FactorySystem* f) {
+		void CreateEntities(CompositeSystem* f) {
 			for (auto i = 10000; i < 10000 + n; i++) {
 				std::vector<Property> prop;
 				Property p("shape", std::string("sphere"));
@@ -52,7 +51,7 @@ namespace Sigma {
 				prop.push_back(t);
 				Property u("id", int(1));
 				prop.push_back(u);
-				f->create("GLIcoSphere", i, prop);
+				f->AddEntity("GLIcoSphere", i, prop);
 			}
 		}
 
