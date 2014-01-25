@@ -3,6 +3,9 @@
 
 #include <unordered_map>
 #include "BitArray.hpp"
+#include "IFactory.h"
+#include "IECSFactory.h"
+#include "systems/FactorySystem.h"
 
 namespace Sigma {
 	struct EntityProperty {
@@ -56,6 +59,24 @@ namespace Sigma {
          */
 		const BitArray<uint32_t>& GetBitArray(CompositeID cid) const {
 			return composite_entity_map.at(cid);
+		}
+
+        /** \brief Register a factory
+         *
+         * \param factory IFactory& the factory to register
+         *
+         */
+		void register_Factory(IFactory& f) {
+			factory.register_Factory(f);
+		}
+
+        /** \brief Register an ECS factory
+         *
+         * \param factory IFactory& the factory to register
+         *
+         */
+		void register_ECSFactory(IECSFactory& f) {
+			factory.register_ECSFactory(f);
 		}
 
 		FactorySystem& GetFactory() {

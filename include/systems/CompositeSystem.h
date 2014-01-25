@@ -68,6 +68,24 @@ namespace Sigma {
 			return suscribers.GetFactory();
 		}
 
+        /** \brief Register a factory
+         *
+         * \param factory IFactory& the factory to register
+         *
+         */
+		DLL_EXPORT void register_Factory(IFactory& factory) {
+			return suscribers.register_Factory(factory);
+		}
+
+        /** \brief Register an ECS factory
+         *
+         * \param factory IECSFactory& the factory to register
+         *
+         */
+		DLL_EXPORT void register_ECSFactory(IECSFactory& factory) {
+			return suscribers.register_ECSFactory(factory);
+		}
+
         /** \brief Process the orders in the queues and remove orphans
          *
          * First removal orders are processed, then the composites with

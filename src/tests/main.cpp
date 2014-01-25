@@ -49,11 +49,11 @@ int main(int argCount, char **argValues) {
 	// EntitySystem can add components
 	Sigma::EntitySystem entitySystem(&factory);
 
-	factory.register_Factory(glsys);
-	factory.register_Factory(alsys);
-	factory.register_Factory(bphys);
-	factory.register_ECSFactory(bphys);
-	factory.register_Factory(webguisys);
+	cpsys.register_Factory(glsys);
+	cpsys.register_Factory(alsys);
+	cpsys.register_Factory(bphys);
+	cpsys.register_ECSFactory(bphys);
+	cpsys.register_Factory(webguisys);
 
 	if (!glfwos.InitializeWindow(1024, 768, "Sigma GLFW Test Window")) {
 		std::cerr << "Failed creating the window or context." << std::endl;
