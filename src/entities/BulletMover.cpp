@@ -5,10 +5,12 @@
 
 namespace Sigma {
 
-	BulletMover::BulletMover(const id_t entityID, const std::vector<Property>& properties) : IEntity(entityID), body(0) {
+	BulletMover::BulletMover(const id_t entityID, const std::vector<Property>& properties) : IEntity(entityID) {
         IEntity::entitySystem->addComposite(this, CompositeID("PhysicalWorldLocation"), properties);
         IEntity::entitySystem->addComposite(this, CompositeID("InterpolatedMovement"), properties);
         IEntity::entitySystem->addComposite(this, CompositeID("ControllableMove"), properties);
+        position = *GetAs<Position>()->get();
+        orientation = *GetAs<Orientation>()->get();
 	}
 
 	// TODO : make the Bullet simulation static so that we can
@@ -17,7 +19,7 @@ namespace Sigma {
 		// Add the body component
 		IEntity::entitySystem->addComposite(this, CompositeID("RigidBody"), properties);
 		// store the body component
-		body = GetAs<Body>()->get();
+		body = *GetAs<Body>()->get();
 		// TODO: move this. Is it really necessary anyway ?
         RigidBody::getBody(entityID).lock()->setActivationState(DISABLE_DEACTIVATION);
 	}

@@ -10,6 +10,7 @@
 #include "IComponent.h"
 #include "components/SigmaMotionState.h"
 #include "components/Orientation.h"
+#include "components/Position.h"
 #include <map>
 #include <memory>
 

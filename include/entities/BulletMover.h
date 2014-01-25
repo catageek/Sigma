@@ -46,6 +46,8 @@ namespace Sigma {
 		DLL_EXPORT void InitializeRigidBody(const std::vector<Property>& properties);
 
 	private:
-		std::weak_ptr<btRigidBody>* body;
+		std::weak_ptr<btRigidBody> body;
+		std::weak_ptr<position_type> position;
+		std::weak_ptr<orientation_type> orientation;
 	};
 }

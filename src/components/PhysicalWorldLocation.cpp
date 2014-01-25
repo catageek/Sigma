@@ -31,7 +31,12 @@ namespace Sigma {
 		transform_ptr_map.emplace(id, std::shared_ptr<GLTransform>(&transform_map.at(id)));
 		(*updated_set)[id] = true;
 		std::cout << "adding entity " << id << " (" << x << ", " << y << ", " << z << ")" << std::endl;
-		return std::vector<std::unique_ptr<IECSComponent>>();
+		// return the components
+		// TODO : return the transform too
+		auto v = std::vector<std::unique_ptr<IECSComponent>>();
+		v.emplace_back(std::unique_ptr<IECSComponent>(new Position(pphysical.at(id))));
+		v.emplace_back(std::unique_ptr<IECSComponent>(new Orientation(ophysical.at(id))));
+		return v;
 	}
 
 	std::vector<std::unique_ptr<IECSComponent>> PhysicalWorldLocation::AddEntity(const id_t id, const std::vector<Property> &properties) {
