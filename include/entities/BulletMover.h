@@ -47,5 +47,6 @@ namespace Sigma {
 
 	private:
 		std::weak_ptr<btRigidBody>* body;
+		orientation_type* orientation;
 	};
 }

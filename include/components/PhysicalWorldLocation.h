@@ -4,6 +4,7 @@
 #include "Sigma.h"
 #include "BitArray.hpp"
 #include "VectorMap.hpp"
+#include "MapArray.hpp"
 #include "Property.h"
 #include "SharedPointerMap.hpp"
 #include "GLTransform.h"
@@ -85,12 +86,14 @@ namespace Sigma {
 			pphysical.at(id) = vec;
 		}
 
-
-		static std::unique_ptr<IECSComponent> getOrientation(const id_t id) {
+		static orientation_type& getOrientation(const id_t id) {
+			return ophysical.at(id);
+		}
+/*		static std::unique_ptr<IECSComponent> getOrientation(const id_t id) {
 			return std::unique_ptr<IECSComponent>(new Orientation(ophysical.at(id)));
 		};
 
-		static inline SigmaMotionState* GetMotionState(const id_t id) {
+*/		static inline SigmaMotionState* GetMotionState(const id_t id) {
 			return new SigmaMotionState(id, pphysical, ophysical);
 		};
 
@@ -174,7 +177,7 @@ namespace Sigma {
 */
 	private:
 		static VectorMap<id_t, position_type> pphysical;
-		static VectorMap<id_t, orientation_type> ophysical;
+		static MapArray<orientation_type> ophysical;
 		static std::shared_ptr<BitArray<unsigned int>> updated_set;
 		static std::unordered_map<id_t, GLTransform> transform_map;
 		// we need this hack to keep a shared_ptr for each transform since SpatialComponent
