@@ -3,7 +3,7 @@
 
 #include <unordered_map>
 #include "BitArray.hpp"
-#include "systems/CompositeSuscribers.h"
+#include "systems/CompositeSubscribers.h"
 #include "systems/CompositeDependency.h"
 #include "systems/FactorySystem.h"
 
@@ -23,7 +23,7 @@ namespace Sigma {
          *
          */
 		DLL_EXPORT void AddEntity(CompositeID cid, id_t eid, const std::vector<Property> &properties) {
-			suscribers.QueueAddEntity(eid, cid, properties);
+			subscribers.QueueAddEntity(eid, cid, properties);
 		}
 
         /** \brief Remove a composite to an entity
@@ -35,7 +35,7 @@ namespace Sigma {
          *
          */
 		DLL_EXPORT void RemoveEntity(id_t eid, CompositeID cid) {
-			suscribers.QueueRemoveEntity(eid, cid);
+			subscribers.QueueRemoveEntity(eid, cid);
 		}
 
         /** \brief Tell if an entity has a composite
@@ -46,7 +46,7 @@ namespace Sigma {
          *
          */
 		bool HasComposite(id_t eid, CompositeID cid) {
-			return suscribers.HasComposite(eid, cid);
+			return subscribers.HasComposite(eid, cid);
 		}
 
         /** \brief Declare a dependency for a composite
@@ -65,7 +65,7 @@ namespace Sigma {
          *
          */
 		DLL_EXPORT FactorySystem& GetFactory() {
-			return suscribers.GetFactory();
+			return subscribers.GetFactory();
 		}
 
         /** \brief Register a factory
@@ -74,7 +74,7 @@ namespace Sigma {
          *
          */
 		DLL_EXPORT void register_Factory(IFactory& factory) {
-			return suscribers.register_Factory(factory);
+			return subscribers.register_Factory(factory);
 		}
 
         /** \brief Register an ECS factory
@@ -83,7 +83,7 @@ namespace Sigma {
          *
          */
 		DLL_EXPORT void register_ECSFactory(IECSFactory& factory) {
-			return suscribers.register_ECSFactory(factory);
+			return subscribers.register_ECSFactory(factory);
 		}
 
         /** \brief Process the orders in the queues and remove orphans
@@ -93,9 +93,9 @@ namespace Sigma {
          *
          */
 		DLL_EXPORT void Update() {
-			suscribers.ProcessRemoval();
+			subscribers.ProcessRemoval();
 			RemoveOrphans();
-			suscribers.ProcessAddition();
+			subscribers.ProcessAddition();
 		}
 
 	private:
@@ -110,12 +110,12 @@ namespace Sigma {
 				not_finished = false;
 				for(auto itp = dmap.begin(), end_p = dmap.end(); itp != end_p; itp = dmap.upper_bound(itp->first)) {
 					// for each unique key of parent
-					auto parent = suscribers.GetBitArray(itp->first);
+					auto parent = subscribers.GetBitArray(itp->first);
 					// get all children
 					auto range = dependencies.map().equal_range(itp->first);
 					for(auto itc = range.first; itc != range.second; ++itc) {
 						// for each child
-						auto child = suscribers.GetBitArray(itc->second);
+						auto child = subscribers.GetBitArray(itc->second);
 						// looking for entities having child and not parent
 						auto result = child & (~parent);
 						for (auto ite = result.begin(), end_e = result.end(); ite != end_e; ++ite) {
@@ -130,7 +130,7 @@ namespace Sigma {
 		};
 
 		// The container for entity ID's that suscribe to each component
-		CompositeSuscribers suscribers;
+		CompositeSubscribers subscribers;
 		CompositeDependency dependencies;
 	};
 }

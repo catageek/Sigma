@@ -1,5 +1,5 @@
-#ifndef COMPOSITESUSCRIBERS_H_INCLUDED
-#define COMPOSITESUSCRIBERS_H_INCLUDED
+#ifndef COMPOSITESUBSCRIBERS_H_INCLUDED
+#define COMPOSITESUBSCRIBERS_H_INCLUDED
 
 #include <unordered_map>
 #include "BitArray.hpp"
@@ -15,10 +15,10 @@ namespace Sigma {
 		std::vector<Property> properties;
 	};
 
-	class CompositeSuscribers {
+	class CompositeSubscribers {
 	public:
-		CompositeSuscribers() : factory(FactorySystem::getInstance()) {};
-		virtual ~CompositeSuscribers() {};
+		CompositeSubscribers() : factory(FactorySystem::getInstance()) {};
+		virtual ~CompositeSubscribers() {};
 
         /** \brief Add a composite removal to the queue
          *
@@ -127,4 +127,4 @@ namespace Sigma {
 }
 
 
-#endif // COMPOSITESUSCRIBERS_H_INCLUDED
+#endif // COMPOSITESUBSCRIBERS_H_INCLUDED
