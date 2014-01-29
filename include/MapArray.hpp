@@ -29,9 +29,9 @@ namespace Sigma {
 
 		void clear(const id_t id) {}; // TODO
 
-		std::iterator<id_t,T> begin() { return MapArrayIterator<T>(map_array.cbegin(), map_array.cend()); };
+		MapArrayIterator<T> begin() { return MapArrayIterator<T>(map_array.cbegin(), map_array.cend()); };
 
-		std::iterator<id_t,T> end() { return MapArrayIterator<T>(map_array.cend(), map_array.cend()); };
+		MapArrayIterator<T> end() { return MapArrayIterator<T>(map_array.cend(), map_array.cend()); };
 
 		Chunk<T>& DataChunk(const id_t id) { return map_array.at(ChunkId(id)); };
 
@@ -59,7 +59,7 @@ namespace Sigma {
 
 		virtual ~MapArrayIterator() {};
 
-		MapArrayIterator(const MapArrayIterator& it) : chunk_iterator(it.chunk_iterator), chunk_end(it.chunk_end) {
+		MapArrayIterator(const MapArrayIterator<T>& it) : chunk_iterator(it.chunk_iterator), chunk_end(it.chunk_end) {
 			if (chunk_iterator != chunk_end) {
 				p = it.p;
 			}
@@ -73,15 +73,18 @@ namespace Sigma {
 			return *this;
 		};
 
-		bool operator==(const MapArrayIterator& mai) {return (chunk_iterator == mai.chunk_iterator) && ((chunk_iterator == chunk_end) ||(p == mai.p)); };
-		bool operator!=(const MapArrayIterator& mai) { return ! (*this == mai); };
+		bool operator==(const MapArrayIterator<T>& mai) const {return (chunk_iterator == mai.chunk_iterator) && ((chunk_iterator == chunk_end) ||(p == mai.p)); };
+		bool operator!=(const MapArrayIterator<T>& mai) const { return ! (*this == mai); };
 		std::pair<id_t,T>& operator*() { return std::make_pair(p, chunk_iterator->second.data[MapArray<T>::Index(p)]); };
+		std::pair<id_t,T>* operator->() { tmp_pair = std::make_pair(p, chunk_iterator->second.data[MapArray<T>::Index(p)]); return &tmp_pair; };
 
 	private:
 		MapArrayIterator operator++(int) {};
 		id_t p;
-		typename std::map<id_t, Chunk<T>>::const_iterator& chunk_iterator;
-		typename std::map<id_t, Chunk<T>>::const_iterator& chunk_end;
+		typename std::map<id_t, Chunk<T>>::const_iterator chunk_iterator;
+		typename std::map<id_t, Chunk<T>>::const_iterator chunk_end;
+		// placeholder for returned value of dereference operator
+		std::pair<id_t,T> tmp_pair;
 	};
 }
 
