@@ -10,6 +10,7 @@ namespace Sigma {
         IEntity::entitySystem->addComposite(this, CompositeID("InterpolatedMovement"), properties);
         IEntity::entitySystem->addComposite(this, CompositeID("ControllableMove"), properties);
         orientation = &PhysicalWorldLocation::getOrientation(entityID);
+        position = &PhysicalWorldLocation::getPosition(entityID);
 	}
 
 	// TODO : make the Bullet simulation static so that we can
