@@ -13,8 +13,8 @@ namespace Sigma {
 
 		void SigmaMotionState::getWorldTransform(btTransform &worldTrans) const {
             worldTrans.setIdentity();
-            auto xyz = wp->at(id).lock();
-            worldTrans.setOrigin(btVector3(xyz->x, xyz->y, xyz->z));
+            auto xyz = wp->at(id);
+            worldTrans.setOrigin(btVector3(xyz.x, xyz.y, xyz.z));
             orientation_type o = wo->at(id);
             worldTrans.getBasis().setEulerZYX(o.alpha, o.beta, o.gamma);
         };

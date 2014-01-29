@@ -23,11 +23,7 @@ namespace Sigma {
 		// Directional forces second, as Move depends on transform.orientation
 		// TODO : use the id parameter
 		auto forces = Sigma::ControllableMove::getForces(this->GetEntityID());
-		if (forces == nullptr) {
-				assert(0 && "id does not exist");
-		}
-
-		for (auto forceitr = forces->begin(); forceitr != forces->end(); ++forceitr) {
+		for (auto forceitr = forces.begin(); forceitr != forces.end(); ++forceitr) {
 			//this->transform->Translate((*forceitr) * deltavec);
 
 			// For now we are applying forces relative to the orientation

@@ -4,6 +4,7 @@
 #include <list>
 #include <unordered_map>
 #include <memory>
+#include <vector>
 
 #include "glm/glm.hpp"
 #include "Sigma.h"
@@ -11,7 +12,7 @@
 #include "IECSComponent.h"
 #include "IComponent.h"
 #include "GLTransform.h"
-#include "VectorMap.hpp"
+#include "MapArray.hpp"
 
 namespace Sigma {
 	typedef std::list<glm::vec3> forces_list; // The list of forces for each entity
@@ -45,13 +46,11 @@ namespace Sigma {
 		// Note that all data have the same lifecycle : created at once, deleted at once
 		// If this is not the case, split the component
 		static std::vector<std::unique_ptr<IECSComponent>> AddEntity(const id_t id) {
-			if (getForces(id) == nullptr && getRotationForces(id) == nullptr) {
-				forces_map[id] = forces_list();
-				rotationForces_map.emplace(id, rotationForces_list());
-				cumulatedForces_map[id] = glm::vec3();
-				//TODO: return the vector of components
-				return std::vector<std::unique_ptr<IECSComponent>>();
-			}
+			// TODO: check that the composite does not exist for this entity
+			forces_map[id] = forces_list();
+			rotationForces_map.emplace(id, rotationForces_list());
+			cumulatedForces_map[id] = glm::vec3();
+			//TODO: return the vector of components
 			return std::vector<std::unique_ptr<IECSComponent>>();
 		}
 
@@ -70,15 +69,12 @@ namespace Sigma {
 		 */
 		static void AddForce(const id_t id, glm::vec3 force) {
 			auto forces = getForces(id);
-			if (forces == nullptr) {
-				assert(0 && "id does not exist");
-			}
-			for (auto forceitr = forces->begin(); forceitr != forces->end(); ++forceitr) {
+			for (auto forceitr = forces.begin(); forceitr != forces.end(); ++forceitr) {
 				if ((*forceitr) == force) {
 					return;
 				}
 			}
-			forces->push_back(force);
+			forces.push_back(force);
 		}
 
 		/**
@@ -89,17 +85,11 @@ namespace Sigma {
 		 */
 		static void RemoveForce(const id_t id, const glm::vec3& force) {
 			auto forces = getForces(id);
-			if (forces == nullptr) {
-				assert(0 && "id does not exist");
-			}
-			forces->remove(force);
+			forces.remove(force);
 		}
 
 		static void AddRotationForce(const id_t id, const glm::vec3 rotation) {
 			auto rotationForces = getRotationForces(id);
-			if (rotationForces == nullptr) {
-				assert(0 && "id does not exist");
-			}
 			for (auto rotitr = rotationForces->begin(); rotitr != rotationForces->end(); ++rotitr) {
 				if ((*rotitr) == rotation) {
 					return;
@@ -110,9 +100,6 @@ namespace Sigma {
 
 		static void RemoveRotationForce(const id_t id, glm::vec3 rotation) {
 			auto rotationForces = getRotationForces(id);
-			if (rotationForces == nullptr) {
-				assert(0 && "id does not exist");
-			}
 			rotationForces->remove(rotation);
 		}
 
@@ -123,15 +110,9 @@ namespace Sigma {
 		 */
 		static void ClearForces(const id_t id) {
 			auto forces = getForces(id);
-			if (forces == nullptr) {
-				assert(0 && "id does not exist");
-			}
-			forces->clear();
+			forces.clear();
 
 			auto rotationForces = getRotationForces(id);
-			if (rotationForces == nullptr) {
-				assert(0 && "id does not exist");
-			}
 			rotationForces->clear();
 		}
 
@@ -152,12 +133,8 @@ namespace Sigma {
 		 */
 		static void CumulateForces();
 
-		static forces_list* getForces(const id_t id) {
-			if (forces_map.count(id)) {
-				auto forces = forces_map.at(id);
-				return const_cast<forces_list*>(forces.lock().get());
-			}
-			return nullptr;
+		static forces_list& getForces(const id_t id) {
+			return forces_map.at(id);
 		}
 
 		static rotationForces_list* getRotationForces(const id_t id) {
@@ -169,9 +146,9 @@ namespace Sigma {
 		}
 
 	private:
-		static VectorMap<id_t, forces_list> forces_map; // The list of forces to apply each update loop.
+		static MapArray<forces_list> forces_map; // The list of forces to apply each update loop.
 		static std::unordered_map<id_t, rotationForces_list> rotationForces_map;
-		static VectorMap<id_t, glm::vec3> cumulatedForces_map;
+		static MapArray<glm::vec3> cumulatedForces_map;
 	};
 }
 
