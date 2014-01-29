@@ -5,12 +5,12 @@
 #include "BitArray.hpp"
 #include "MapArray.hpp"
 #include "Property.h"
-#include "SharedPointerMap.hpp"
 #include "GLTransform.h"
 #include "IComponent.h"
 #include "components/SigmaMotionState.h"
 #include "IECSComponent.h"
 #include <map>
+#include <unordered_map>
 #include <memory>
 
 namespace Sigma {

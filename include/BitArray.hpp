@@ -5,7 +5,6 @@
 #include <stdexcept>
 #include <memory>
 #include <iostream>
-#include "SharedPointerMap.hpp"
 // deactivated
 //#include "AlignedVectorAllocator.hpp"
 
