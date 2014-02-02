@@ -19,7 +19,7 @@ namespace Sigma {
 		// Add the body component
 		IEntity::entitySystem->addComposite(this, CompositeID("RigidBody"), properties);
 		// store the body component
-		body = GetAs<Body>()->get();
+		body = RigidBody::getBody(GetEntityID()).lock().get();
 		// TODO: move this. Is it really necessary anyway ?
         RigidBody::getBody(entityID).lock()->setActivationState(DISABLE_DEACTIVATION);
 	}

@@ -28,7 +28,7 @@ namespace Sigma {
 
 		virtual ~RigidBody() {};
 
-		static std::vector<std::unique_ptr<IECSComponent>> AddEntity(const id_t id, const std::vector<Property> &properties);
+		static void AddEntity(const id_t id, const std::vector<Property> &properties);
 
 		// TODO : read properties
 //		static std::vector<std::unique_ptr<IECSComponent>> AddEntity(const id_t id, const std::vector<Property> &properties) { return AddEntity(id); };

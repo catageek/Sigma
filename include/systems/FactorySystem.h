@@ -29,7 +29,7 @@ namespace Sigma {
 						const id_t entityID,
 						const std::vector<Property> &properties);
 
-			DLL_EXPORT std::vector<std::unique_ptr<IECSComponent>> createECS(const CompositeID& type,
+			DLL_EXPORT void createECS(const CompositeID& type,
 							const id_t entityID,
 							const std::vector<Property> &properties);
 

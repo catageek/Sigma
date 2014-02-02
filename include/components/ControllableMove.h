@@ -45,13 +45,11 @@ namespace Sigma {
 	public:
 		// Note that all data have the same lifecycle : created at once, deleted at once
 		// If this is not the case, split the component
-		static std::vector<std::unique_ptr<IECSComponent>> AddEntity(const id_t id) {
+		static void AddEntity(const id_t id) {
 			// TODO: check that the composite does not exist for this entity
 			forces_map[id] = forces_list();
 			rotationForces_map.emplace(id, rotationForces_list());
 			cumulatedForces_map[id] = glm::vec3();
-			//TODO: return the vector of components
-			return std::vector<std::unique_ptr<IECSComponent>>();
 		}
 
 		static void RemoveEntity(const id_t id) {

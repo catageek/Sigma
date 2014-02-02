@@ -35,16 +35,15 @@ namespace Sigma{
 		}
 	}
 
-	std::vector<std::unique_ptr<IECSComponent>> FactorySystem::createECS(const CompositeID& type,
+	void FactorySystem::createECS(const CompositeID& type,
 							const id_t entityID,
 							const std::vector<Property> &properties){
 		if(registeredECSFactoryFunctions.find(type) != registeredECSFactoryFunctions.end()){
-			std::cerr << "Creating ECS composite of type: " << type << std::endl;
-			return registeredECSFactoryFunctions[type](entityID, properties);
+			std::cerr << "Creating ECS component of type: " << type << std::endl;
+			registeredECSFactoryFunctions[type](entityID, properties);
 		}
 		else {
-			std::cerr << "Error: Couldn't find composite: " << type << std::endl;
-			return std::vector<std::unique_ptr<IECSComponent>>();
+			std::cerr << "Error: Couldn't find component: " << type << std::endl;
 		}
 	}
 

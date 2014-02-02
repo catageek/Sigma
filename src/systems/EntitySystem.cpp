@@ -7,12 +7,8 @@ namespace Sigma {
 	EntitySystem::EntitySystem(FactorySystem* factory) : componentFactory(factory) { IEntity::entitySystem = this; }
 
 	void EntitySystem::addComposite(IEntity* e, const CompositeID& fid, const std::vector<Property>& properties) {
-		// create feature in ECS and receive a vector of unique_ptr<IECSComponent>
-		auto componentECS = componentFactory->createECS(fid, e->GetEntityID(), properties);
-		// store the pointers of the components in the IEntity component map
-		for (auto itr = componentECS.begin(); itr != componentECS.end(); itr++) {
-			e->Componentmap.emplace((*itr)->getComponentTypeName(), std::move(*itr));
-		}
+		// create feature in ECS
+		componentFactory->createECS(fid, e->GetEntityID(), properties);
 	}
 
 	void EntitySystem::RemoveComposite(IEntity *e, const CompositeID& cid) {

@@ -5,7 +5,7 @@ namespace Sigma {
 	std::unordered_map<id_t, std::shared_ptr<btRigidBody>> RigidBody::body_map;
 	btDiscreteDynamicsWorld* RigidBody::dynamicsWorld;
 
-	std::vector<std::unique_ptr<IECSComponent>> RigidBody::AddEntity(const id_t id, const std::vector<Property> &properties) {
+	void RigidBody::AddEntity(const id_t id, const std::vector<Property> &properties) {
 		if (body_map.count(id)) {
 			assert(0 && "RigidBody already added");
 		}
@@ -87,10 +87,5 @@ namespace Sigma {
 		body_map.insert(p);
 		// add the body to the world
 		dynamicsWorld->addRigidBody(p.second.get());
-
-		// return the component
-		auto v = std::vector<std::unique_ptr<IECSComponent>>();
-		v.emplace_back(std::unique_ptr<IECSComponent>(new Body(p.second)));
-		return v;
 	}
 }

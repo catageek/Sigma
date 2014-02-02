@@ -57,10 +57,10 @@ namespace Sigma {
 
 		virtual ~PhysicalWorldLocation() {};
 
-		static std::vector<std::unique_ptr<IECSComponent>> AddEntityPosition(const id_t id, const coordinate_type x, const coordinate_type y,
+		static void AddEntityPosition(const id_t id, const coordinate_type x, const coordinate_type y,
 				   const coordinate_type z, const coordinate_type rx, const coordinate_type ry, const coordinate_type rz);
 
-		static std::vector<std::unique_ptr<IECSComponent>> AddEntity(const id_t id, const std::vector<Property> &properties);
+		static void AddEntity(const id_t id, const std::vector<Property> &properties);
 
 		static void RemoveEntity(const id_t id) {
 			pphysical.clear(id);

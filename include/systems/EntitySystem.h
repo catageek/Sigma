@@ -19,13 +19,9 @@ namespace Sigma {
 		IEntity(const id_t entityID) : entityID(entityID) {};
 		virtual ~IEntity() {};
 
-		template<class T>
-		T* GetAs();
-
 		const id_t GetEntityID() const { return entityID; };
 
 		static EntitySystem* entitySystem;
-		std::unordered_map<ComponentID,std::unique_ptr<IECSComponent>> Componentmap;
 
 	protected:
 		const id_t entityID;
@@ -39,9 +35,6 @@ namespace Sigma {
 	public:
 		DLL_EXPORT EntitySystem(FactorySystem* factory);
 		virtual ~EntitySystem() {};
-
-		template<class T>
-		T* getComponent(IEntity* e);
 
         /** \brief Add a composite, i.e a set of predefined components, to an entity
          *
@@ -59,26 +52,6 @@ namespace Sigma {
 	private:
 		FactorySystem* componentFactory;
 	};
-
-	template<class T>
-	T* IEntity::GetAs() {
-		return entitySystem->getComponent<T>(this);
-	}
-
-	// EntitySystem implementation
-
-	template<class T>
-	T* EntitySystem::getComponent(IEntity* e) {
-		auto component = static_cast<T*>(e->Componentmap[T::getStaticComponentTypeName()].get());
-		//if (component->expired()) {
-			// TODO: query the ECS for the updated component
-			// for replacement in the map
-			//component = ....
-			// TODO: register update functions in factory ?
-		//}
-		return component;
-	}
-
 }
 
 #endif // ENTITYSYSTEM_H_INCLUDED

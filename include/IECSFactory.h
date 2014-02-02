@@ -12,8 +12,7 @@
 namespace Sigma {
     class IECSFactory {
     public:
-        typedef std::function<std::vector<std::unique_ptr<IECSComponent>>(const id_t,
-                                    const std::vector<Property>&)> FactoryFunction;
+        typedef std::function<void(const id_t,const std::vector<Property>&)> FactoryFunction;
         IECSFactory(){};
         virtual ~IECSFactory(){};
         /**

@@ -18,7 +18,7 @@ namespace Sigma {
         }
     }
 
-	std::vector<std::unique_ptr<IECSComponent>> PhysicalWorldLocation::AddEntityPosition(const id_t id, coordinate_type x, coordinate_type y,
+	void PhysicalWorldLocation::AddEntityPosition(const id_t id, coordinate_type x, coordinate_type y,
 				   coordinate_type z, const coordinate_type rx, const coordinate_type ry, const coordinate_type rz) {
 		pphysical[id] = position_type(x, y, z);
 		ophysical[id] = orientation_type(rx, ry, rz);
@@ -30,10 +30,9 @@ namespace Sigma {
 		transform_ptr_map.emplace(id, std::shared_ptr<GLTransform>(&transform_map.at(id)));
 		(*updated_set)[id] = true;
 		std::cout << "adding entity " << id << " (" << x << ", " << y << ", " << z << ")" << std::endl;
-		return std::vector<std::unique_ptr<IECSComponent>>();
 	}
 
-	std::vector<std::unique_ptr<IECSComponent>> PhysicalWorldLocation::AddEntity(const id_t id, const std::vector<Property> &properties) {
+	void PhysicalWorldLocation::AddEntity(const id_t id, const std::vector<Property> &properties) {
 		float x = 0.0f;
 		float y = 0.0f;
 		float z = 0.0f;
@@ -63,6 +62,6 @@ namespace Sigma {
 				rz = p->Get<float>();
 			}
 		}
-		return AddEntityPosition(id, x, y, z, rx, ry, rz);
+		AddEntityPosition(id, x, y, z, rx, ry, rz);
 	}
 }

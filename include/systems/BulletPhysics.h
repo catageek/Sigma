@@ -40,10 +40,10 @@ namespace Sigma {
 		DLL_EXPORT IComponent* createBulletShapeMesh(const id_t entityID, const std::vector<Property> &properties);
 		DLL_EXPORT IComponent* createBulletShapeSphere(const id_t entityID, const std::vector<Property> &properties);
 
-		std::unique_ptr<IECSComponent> addControllableMove(const id_t entityID, const std::vector<Property> &properties);
-		std::unique_ptr<IECSComponent> addInterpolatedMove(const id_t entityID, const std::vector<Property> &properties);
-		std::unique_ptr<IECSComponent> addPhysicalWorldLocation(const id_t entityID, const std::vector<Property> &properties);
-		std::unique_ptr<IECSComponent> addRigidBody(const id_t entityID, const std::vector<Property> &properties);
+		void addControllableMove(const id_t entityID, const std::vector<Property> &properties);
+		void addInterpolatedMove(const id_t entityID, const std::vector<Property> &properties);
+		void addPhysicalWorldLocation(const id_t entityID, const std::vector<Property> &properties);
+		void addRigidBody(const id_t entityID, const std::vector<Property> &properties);
 
 		DLL_EXPORT void initViewMover(GLTransform& t);
 		PhysicsController* getViewMover() {

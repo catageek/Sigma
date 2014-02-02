@@ -27,13 +27,10 @@ namespace Sigma{
 
         virtual ~InterpolatedMovement() {};
 
-        static std::vector<std::unique_ptr<IECSComponent>> AddEntity(const id_t id) {
+        static void AddEntity(const id_t id) {
             if (getRotationTarget(id) == nullptr) {
                 rotationtarget_map.emplace(id, glm::vec3());
-                //TODO: return components
-                return std::vector<std::unique_ptr<IECSComponent>>();
             }
-            return std::vector<std::unique_ptr<IECSComponent>>();
         };
 
         static void RemoveEntity(const id_t id) {
