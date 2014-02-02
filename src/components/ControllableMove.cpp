@@ -32,8 +32,8 @@ namespace Sigma {
 			auto id = cf_it->first;
             auto body = RigidBody::getBody(id);
             auto finalForce = cf_it->second;
-            if (! body.expired()) {
-                body.lock()->setLinearVelocity(btVector3(finalForce.x, body.lock()->getLinearVelocity().y() + 0.000000001f, finalForce.z));
+            if (CompositeSubscribers::HasComposite(id, "RigidBody")) {
+                body->setLinearVelocity(btVector3(finalForce.x, body->getLinearVelocity().y() + 0.000000001f, finalForce.z));
             }
             else {
 				auto position = PhysicalWorldLocation::getPosition(id);

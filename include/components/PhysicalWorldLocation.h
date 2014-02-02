@@ -81,7 +81,6 @@ namespace Sigma {
 		};
 
 		static void setPosition(const id_t id, const position_type& vec) {
-			// TODO : get the value directly instead of WeakPtrWrapper
 			pphysical.at(id) = vec;
 		}
 

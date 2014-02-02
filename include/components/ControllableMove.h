@@ -13,6 +13,7 @@
 #include "IComponent.h"
 #include "GLTransform.h"
 #include "MapArray.hpp"
+#include "systems/CompositeSubscribers.h"
 
 namespace Sigma {
 	typedef std::list<glm::vec3> forces_list; // The list of forces for each entity

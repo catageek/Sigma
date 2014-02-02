@@ -1,7 +1,6 @@
 #ifndef RIGIDBODY_H_INCLUDED
 #define RIGIDBODY_H_INCLUDED
 
-#include <unordered_map>
 #include <vector>
 
 #include <bullet/btBulletDynamicsCommon.h>
@@ -9,7 +8,7 @@
 #include "Property.h"
 #include "components/BulletShapeMesh.h"
 #include "resources/Mesh.h"
-#include "components/Body.h"
+#include "MapArray.hpp"
 
 namespace Sigma {
 	/** \brief A component for entities that have a rigid body
@@ -34,15 +33,11 @@ namespace Sigma {
 //		static std::vector<std::unique_ptr<IECSComponent>> AddEntity(const id_t id, const std::vector<Property> &properties) { return AddEntity(id); };
 
 		static void RemoveEntity(const id_t id) {
-			body_map.erase(id);
+			body_map.clear(id);
 		};
 
-		static std::weak_ptr<btRigidBody> getBody(const id_t id) {
-			auto body = body_map.find(id);
-			if (body != body_map.end()) {
-				return body->second;
-			}
-			return std::shared_ptr<btRigidBody>();
+		static btRigidBody* getBody(const id_t id) {
+			return body_map.at(id);
 		};
 
 		static void setWorld(btDiscreteDynamicsWorld* world) {
@@ -50,7 +45,7 @@ namespace Sigma {
 		}
 
 	private:
-		static std::unordered_map<id_t, std::shared_ptr<btRigidBody>> body_map;
+		static MapArray<btRigidBody*> body_map;
 		static btDiscreteDynamicsWorld* dynamicsWorld;
 	};
 }

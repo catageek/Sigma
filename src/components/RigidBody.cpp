@@ -2,14 +2,10 @@
 #include "components/PhysicalWorldLocation.h"
 
 namespace Sigma {
-	std::unordered_map<id_t, std::shared_ptr<btRigidBody>> RigidBody::body_map;
+	MapArray<btRigidBody*> RigidBody::body_map;
 	btDiscreteDynamicsWorld* RigidBody::dynamicsWorld;
 
 	void RigidBody::AddEntity(const id_t id, const std::vector<Property> &properties) {
-		if (body_map.count(id)) {
-			assert(0 && "RigidBody already added");
-		}
-
 		btCollisionShape* shape = nullptr;
 		std::string shape_type;
 
@@ -82,10 +78,8 @@ namespace Sigma {
 		auto motionState =	PhysicalWorldLocation::GetMotionState(id);
 		btRigidBody::btRigidBodyConstructionInfo fallRigidBodyCI(mass, motionState, shape,fallInertia);
 		shape->calculateLocalInertia(mass,fallInertia);
-		auto body = new btRigidBody(fallRigidBodyCI);
-		auto p = std::make_pair(id, std::shared_ptr<btRigidBody>(body));
-		body_map.insert(p);
+		body_map[id] = new btRigidBody(fallRigidBodyCI);
 		// add the body to the world
-		dynamicsWorld->addRigidBody(p.second.get());
+		dynamicsWorld->addRigidBody(body_map.at(id));
 	}
 }
