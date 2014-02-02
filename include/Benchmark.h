@@ -4,9 +4,9 @@
 #include <random>
 #include <chrono>
 
-#include "components/PhysicalWorldLocation.h"
-#include "components/ControllableMove.h"
-#include "components/RigidBody.h"
+#include "composites/PhysicalWorldLocation.h"
+#include "composites/ControllableMove.h"
+#include "composites/RigidBody.h"
 #include <bullet/btBulletCollisionCommon.h>
 #include <bullet/btBulletDynamicsCommon.h>
 #include "glm/glm.hpp"

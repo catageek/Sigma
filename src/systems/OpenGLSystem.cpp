@@ -215,6 +215,7 @@ namespace Sigma{
 			}
 		}
 		GLIcoSphere sphere;
+		sphere.InitializeBuffers();
 		std::string meshname = "entity";
 		meshname += entityID;
 		meshname += "icosphere";
@@ -235,6 +236,7 @@ namespace Sigma{
 		std::string texture_name = "";
 		std::string shader_name = "shaders/cubesphere";
 		std::string cull_face = "back";
+		std::string depthFunc = "less";
 		int subdivision_levels = 1;
 		float rotation_speed = 0.0f;
 		bool fix_to_camera = false;
@@ -292,6 +294,9 @@ namespace Sigma{
 			else if (p->GetName() == "lightEnabled") {
 				renderable->SetLightingEnabled(p->Get<bool>());
 			}
+			else if (p->GetName() == "depthFunc") {
+				depthFunc = p->Get<std::string>();
+			}
 		}
 
 		GLCubeSphere sphere;
@@ -302,9 +307,10 @@ namespace Sigma{
 		renderable->SetMesh(&OpenGLSystem::meshes[meshname]);
 		static_cast<GLCubeSphere*>(&OpenGLSystem::meshes[meshname])->SetSubdivisions(subdivision_levels);
 		static_cast<GLCubeSphere*>(&OpenGLSystem::meshes[meshname])->SetFixToCamera(fix_to_camera);
-		static_cast<GLCubeSphere*>(&OpenGLSystem::meshes[meshname])->InitializeBuffers();
 		static_cast<GLCubeSphere*>(&OpenGLSystem::meshes[meshname])->LoadTexture(texture_name);
+		static_cast<GLCubeSphere*>(&OpenGLSystem::meshes[meshname])->InitializeBuffers();
 		renderable->SetCullFace(cull_face);
+		renderable->SetDepthFunc(depthFunc);
 		renderable->Transform()->Scale(scale,scale,scale);
 		renderable->Transform()->Rotate(rx,ry,rz);
 		renderable->Transform()->Translate(x,y,z);
@@ -383,11 +389,16 @@ namespace Sigma{
 			}
 		}
 
-		Mesh mesh;
-		OpenGLSystem::meshes[meshFIlename] = mesh;
-		renderable->SetMesh(&OpenGLSystem::meshes[meshFIlename]);
-		OpenGLSystem::meshes[meshFIlename].LoadObjMesh(meshFIlename);
+		if (this->meshes.find(meshFIlename) == this->meshes.end()) {
+			Mesh mesh;
 
+			this->meshes.insert(std::make_pair(meshFIlename, mesh));
+			this->meshes[meshFIlename].LoadObjMesh(meshFIlename);
+		}
+
+		if (this->meshes.find(meshFIlename) != this->meshes.end()) {
+			renderable->SetMesh(&this->meshes[meshFIlename]);
+		}
 		renderable->SetCullFace(cull_face);
 		renderable->Transform()->Scale(scale,scale,scale);
 		renderable->Transform()->Translate(x,y,z);
@@ -450,14 +461,15 @@ namespace Sigma{
 		}
 
 		GLScreenQuad quad;
-		quad.SetPosition(x, y);
-		quad.SetSize(w, h);
-		quad.InitializeBuffers();
 
 		// It should be loaded, but in case an error occurred double check for it.
 		if (textures.find(textureName) != textures.end()) {
 			quad.SetTexture(&Sigma::OpenGLSystem::textures[textureName]);
 		}
+
+		quad.SetPosition(x, y);
+		quad.SetSize(w, h);
+		quad.InitializeBuffers();
 
 		std::string meshname = "entity";
 		meshname += entityID;
@@ -467,6 +479,7 @@ namespace Sigma{
 		renderable->SetMesh(&OpenGLSystem::meshes[meshname]);
 		renderable->LoadShader("shaders/quad");
 		renderable->InitializeBuffers();
+		renderable->SetLightingEnabled(false);
 		this->screensSpaceComp.push_back(std::unique_ptr<Renderable>(renderable));
 
 		return renderable;
@@ -930,7 +943,6 @@ namespace Sigma{
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 			for (auto citr = this->screensSpaceComp.begin(); citr != this->screensSpaceComp.end(); ++citr) {
-				citr->get()->GetShader()->Use();
 				citr->get()->Render(&viewMatrix[0][0], &this->ProjectionMatrix[0][0]);
 			}
 

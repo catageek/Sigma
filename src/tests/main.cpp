@@ -14,7 +14,7 @@
 #include "systems/WebGUISystem.h"
 #include "OS.h"
 #include "components/SpotLight.h"
-#include "components/PhysicalWorldLocation.h"
+#include "composites/PhysicalWorldLocation.h"
 #include "Benchmark.h"
 
 #ifdef _WIN32

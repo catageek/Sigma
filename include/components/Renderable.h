@@ -29,6 +29,8 @@ namespace Sigma {
 			this->VertBufIndex = 0;
 			this->NormalBufIndex = 3;
 			this->UVBufIndex = 4;
+			this->cull_face = 0;
+			this->depthFunc = GL_LESS;
 		}
 		Renderable(const id_t entityID) : lightingEnabled(true), SpatialComponent(entityID) {
 			memset(&this->buffers, 0, sizeof(this->buffers));
@@ -39,6 +41,8 @@ namespace Sigma {
 			this->VertBufIndex = 0;
 			this->NormalBufIndex = 3;
 			this->UVBufIndex = 4;
+			this->cull_face = 0;
+			this->depthFunc = GL_LESS;
 		} // Ctor that sets the entity ID.
 
 		void SetMesh(Mesh* mesh) {
@@ -139,6 +143,8 @@ namespace Sigma {
 			this->shader->AddUniform("diffuseTexEnabled");
 			this->shader->AddUniform("texAmb");
 			this->shader->AddUniform("texDiff");
+			this->shader->AddUniform("cubeMap");
+			this->shader->AddUniform("cubeMapNormal");
 			this->shader->AddUniform("specularHardness");
 			this->shader->UnUse();
 		}
@@ -171,33 +177,46 @@ namespace Sigma {
 				glCullFace(this->cull_face);
 			}
 
-			glActiveTexture(GL_TEXTURE0);
+			glDepthFunc(this->depthFunc);
+
 			size_t prev = 0;
 			for (int i = 0, cur = this->meshResource->MeshGroup_ElementCount(0); cur != 0; prev = cur, cur = this->meshResource->MeshGroup_ElementCount(++i)) {
 				if (this->meshResource->MaterialGroupsCount() > 0) {
-					Material& mat = this->meshResource->GetMaterialName(this->meshResource->GetMaterialName(prev));
+					const Material* mat = this->meshResource->GetMaterialGroup(*this->meshResource->GetMaterialGroupName(prev));
 
-					if (mat.ambientMap) {
+					if (mat->ambientMap) {
 						glUniform1i((*this->shader)("texEnabled"), 1);
 						glUniform1i((*this->shader)("ambientTexEnabled"), 1);
 						glUniform1i((*this->shader)("texAmb"), 1);
 						glActiveTexture(GL_TEXTURE1);
-						glBindTexture(GL_TEXTURE_2D, mat.ambientMap);
+						glBindTexture(GL_TEXTURE_2D, mat->ambientMap);
 					} else {
 						glUniform1i((*this->shader)("ambientTexEnabled"), 0);
 					}
 
-					if (mat.diffuseMap) {
+					if (mat->diffuseMap) {
 						glUniform1i((*this->shader)("texEnabled"), 1);
 						glUniform1i((*this->shader)("diffuseTexEnabled"), 1);
 						glUniform1i((*this->shader)("texDiff"), 0);
 						glActiveTexture(GL_TEXTURE0);
-						glBindTexture(GL_TEXTURE_2D, mat.diffuseMap);
+						glBindTexture(GL_TEXTURE_2D, mat->diffuseMap);
 					} else {
 						glUniform1i((*this->shader)("diffuseTexEnabled"), 0);
 					}
 
-					glUniform1f((*this->shader)("specularHardness"), mat.hardness);
+					if (mat->cubeMap) {
+						glActiveTexture(GL_TEXTURE0);
+						glUniform1i((*this->shader)("cubeMap"), 0);
+						glBindTexture(GL_TEXTURE_CUBE_MAP, mat->cubeMap);
+					}
+
+					if (mat->cubeNormalMap) {
+						glActiveTexture(GL_TEXTURE1);
+						glUniform1i((*this->shader)("cubeNormalMap"), 0);
+						glBindTexture(GL_TEXTURE_CUBE_MAP, mat->cubeNormalMap);
+					}
+
+					glUniform1f((*this->shader)("specularHardness"), mat->hardness);
 				}
 				else {
 					glUniform1i((*this->shader)("texEnabled"), 0);
@@ -207,12 +226,21 @@ namespace Sigma {
 				glDrawElements(this->DrawMode(), cur, GL_UNSIGNED_INT, (void*)prev);
 			}
 
+			glDepthFunc(GL_LESS);
+
 			// reset defaults
 			glEnable(GL_CULL_FACE);
 			glCullFace(GL_BACK);
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,0);
 			glBindVertexArray(0);
+
+			glActiveTexture(GL_TEXTURE1);
 			glBindTexture(GL_TEXTURE_2D, 0);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, 0);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
 			this->shader->UnUse();
 		} // function Render
 
@@ -242,6 +270,20 @@ namespace Sigma {
 			}
 		};
 
+
+		/**
+		 * \brief Sets the face culling mode
+		 *
+		 */
+		virtual void SetDepthFunc(std::string depthFunc) {
+			if(depthFunc == "less") {
+				this->depthFunc = GL_LESS;
+			}
+			else if (depthFunc == "lequal") {
+				this->depthFunc = GL_LEQUAL;
+			}
+		};
+
 		/** \brief load the given shader
 		 *
 		 * \param filename the base name of the shader. loads filename.vert and filename.frag.
@@ -266,6 +308,7 @@ namespace Sigma {
 		unsigned int vao; // The VAO that describes this component's data.
 		unsigned int drawMode; // The current draw mode (ex. GL_TRIANGLES, GL_TRIANGLE_STRIP).
 		GLuint cull_face; // The current culling method for this component.
+		GLuint depthFunc;
 
 		std::shared_ptr<GLSLShader> shader; // shaders are shared among components
 		// name-->shader map to look up already-loaded shaders (so each can be loaded only once)

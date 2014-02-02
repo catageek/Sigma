@@ -12,6 +12,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
+#include "Sigma.h"
 
 namespace Sigma{
 	// A struct to store which index each of its verts are.
@@ -54,6 +55,8 @@ namespace Sigma{
 		GLuint diffuseMap;
 		GLuint specularMap;
 		GLuint normalMap;
+		GLuint cubeMap;
+		GLuint cubeNormalMap;
 	};
 
 	// Helper structs for OBJ loading
@@ -73,7 +76,7 @@ namespace Sigma{
 	class Mesh {
 	public:
 		Mesh();
-		virtual ~Mesh();
+		DLL_EXPORT virtual ~Mesh();
 
 		/**
 		 * \brief Returns the number of elements to draw for this component.
@@ -245,9 +248,9 @@ namespace Sigma{
 		 *
 		 * Returns the texture coordinate at the specific index.
 		 * \param const size_t index The index of the texture coordinate to get.
-		 * \return const Color* The texture coordinate at the index or nullptr if the index was invalid.
+		 * \return const TexCoord* The texture coordinate at the index or nullptr if the index was invalid.
 		 */
-		TexCoord& GetTexCoord(const size_t index);
+		const TexCoord* GetTexCoord(const size_t index);
 
 		/**
 		 * \brief Returns the size of the vertex color buffer.
@@ -269,9 +272,9 @@ namespace Sigma{
 		 * \brief Gets a material with the given name.
 		 *
 		 * \param[in] const std::string & name The name of the material to find
-		 * \return Material& The material with the specified name.
+		 * \return const Material* The material with the specified name.
 		 */
-		Material& GetMaterialName( const std::string& name );
+		const Material* GetMaterialGroup(const std::string& name);
 
 		/**
 		 * \brief Adds a mesh group index.
@@ -285,9 +288,9 @@ namespace Sigma{
 		 * \brief Gets the material name for the specified material group index.
 		 *
 		 * \param[in] const size_t groupIndex
-		 * \return const std::string& The name of the material used for the specified group.
+		 * \return const std::string* The name of the material used for the specified group.
 		 */
-		const std::string& GetMaterialName(const size_t groupIndex);
+		const std::string* GetMaterialGroupName(const size_t groupIndex);
 
 		/**
 		 * \brief Returns the number of material groups.
@@ -295,9 +298,6 @@ namespace Sigma{
 		 * \return const size_t The number of material groups.
 		 */
 		const size_t MaterialGroupsCount();
-
-		static const std::string DEFAULT_SHADER;
-
 	protected:
 		// Note that these values are protected, not private! Inheriting classes get access to these
 		//  basic drawing elements.

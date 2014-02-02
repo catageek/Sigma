@@ -1,6 +1,6 @@
-#include "components/ControllableMove.h"
-#include "components/PhysicalWorldLocation.h"
-#include "components/RigidBody.h"
+#include "composites/ControllableMove.h"
+#include "composites/PhysicalWorldLocation.h"
+#include "composites/RigidBody.h"
 
 namespace Sigma {
     MapArray<forces_list> ControllableMove::forces_map;
