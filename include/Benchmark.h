@@ -44,9 +44,9 @@ namespace Sigma {
 //					prop.push_back(r);
 				Property s("cull_face", std::string("none"));
 				prop.push_back(s);
-				prop.emplace_back(Property("x", float(PhysicalWorldLocation::getPosition(i)->x)));
-				prop.emplace_back(Property("y", float(PhysicalWorldLocation::getPosition(i)->y)));
-				prop.emplace_back(Property("z", float(PhysicalWorldLocation::getPosition(i)->z)));
+				prop.emplace_back(Property("x", float(PhysicalWorldLocation::getPosition(i).x)));
+				prop.emplace_back(Property("y", float(PhysicalWorldLocation::getPosition(i).y)));
+				prop.emplace_back(Property("z", float(PhysicalWorldLocation::getPosition(i).z)));
 				prop.emplace_back(Property("scale", 10.0f));
 				Property t("lightEnabled", bool(false));
 				prop.push_back(t);

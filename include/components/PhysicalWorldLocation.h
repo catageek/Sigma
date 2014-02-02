@@ -3,14 +3,14 @@
 
 #include "Sigma.h"
 #include "BitArray.hpp"
-#include "VectorMap.hpp"
+#include "MapArray.hpp"
 #include "Property.h"
-#include "SharedPointerMap.hpp"
 #include "GLTransform.h"
 #include "IComponent.h"
 #include "components/SigmaMotionState.h"
-#include "components/Orientation.h"
+#include "IECSComponent.h"
 #include <map>
+#include <unordered_map>
 #include <memory>
 
 namespace Sigma {
@@ -76,8 +76,8 @@ namespace Sigma {
 		 */
 		static void UpdateTransform();
 
-		static std::unique_ptr<position_type> getPosition(const id_t id) {
-			return std::unique_ptr<position_type>(new position_type(pphysical.at(id)));
+		static position_type& getPosition(const id_t id) {
+			return pphysical.at(id);
 		};
 
 		static void setPosition(const id_t id, const position_type& vec) {
@@ -85,10 +85,9 @@ namespace Sigma {
 			pphysical.at(id) = vec;
 		}
 
-
-		static std::unique_ptr<IECSComponent> getOrientation(const id_t id) {
-			return std::unique_ptr<IECSComponent>(new Orientation(ophysical.at(id)));
-		};
+		static orientation_type& getOrientation(const id_t id) {
+			return ophysical.at(id);
+		}
 
 		static inline SigmaMotionState* GetMotionState(const id_t id) {
 			return new SigmaMotionState(id, pphysical, ophysical);
@@ -162,9 +161,9 @@ namespace Sigma {
 		};
 */
 	private:
-		static VectorMap<id_t, position_type> pphysical;
-		static VectorMap<id_t, orientation_type> ophysical;
-		static std::unique_ptr<BitArray<unsigned int>> updated_set;
+		static MapArray<position_type> pphysical;
+		static MapArray<orientation_type> ophysical;
+		static std::shared_ptr<BitArray<unsigned int>> updated_set;
 		static std::unordered_map<id_t, GLTransform> transform_map;
 		// we need this hack to keep a shared_ptr for each transform since SpatialComponent
 		// uses its own GLTransform or a shared one, so we must provide a shared_ptr

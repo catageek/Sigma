@@ -13,6 +13,10 @@ namespace Sigma {
 	typedef std::string CompositeID;
 }
 
+#define CONTAINER_CHUNK_SHIFT 4
+#define CONTAINER_CHUNK_MASK 0xF
+#define CONTAINER_CHUNK_SIZE ((1 << CONTAINER_CHUNK_SHIFT))
+
 #ifdef libSigma_EXPORTS
 // If building as shared library
 #if defined(_MSC_VER)

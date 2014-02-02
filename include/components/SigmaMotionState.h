@@ -3,7 +3,7 @@
 
 //#define BT_USE_DOUBLE_PRECISION
 #include "bullet/btBulletDynamicsCommon.h"
-#include "VectorMap.hpp"
+#include "MapArray.hpp"
 #include <cmath>
 #include "Sigma.h"
 
@@ -13,7 +13,7 @@ namespace Sigma {
 
 	class SigmaMotionState : public btMotionState {
 	public:
-		SigmaMotionState(const id_t id, VectorMap<id_t, position_type>& wp, VectorMap<id_t, orientation_type>& wo)
+		SigmaMotionState(const id_t id, MapArray<position_type>& wp, MapArray<orientation_type>& wo)
 		: id(id), wp(&wp), wo(&wo) {};
 
 		virtual ~SigmaMotionState() {};
@@ -24,8 +24,8 @@ namespace Sigma {
 
 	private:
 		const id_t id;
-		VectorMap<id_t, position_type>* wp;
-		VectorMap<id_t, orientation_type>* wo;
+		MapArray<position_type>* wp;
+		MapArray<orientation_type>* wo;
 	};
 }
 

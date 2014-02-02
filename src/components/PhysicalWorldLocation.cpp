@@ -2,9 +2,9 @@
 #include "components/SigmaMotionState.h"
 
 namespace Sigma {
-	VectorMap<id_t, position_type> PhysicalWorldLocation::pphysical;
-	VectorMap<id_t, orientation_type> PhysicalWorldLocation::ophysical;
-	std::unique_ptr<BitArray<unsigned int>> PhysicalWorldLocation::updated_set = std::move(std::unique_ptr<BitArray<unsigned int>>(new BitArray<unsigned int>()));
+	MapArray<position_type> PhysicalWorldLocation::pphysical;
+	MapArray<orientation_type> PhysicalWorldLocation::ophysical;
+	std::shared_ptr<BitArray<unsigned int>> PhysicalWorldLocation::updated_set = BitArray<unsigned int>::Create();
     std::unordered_map<id_t, GLTransform> PhysicalWorldLocation::transform_map;
     std::unordered_map<id_t, std::shared_ptr<GLTransform>> PhysicalWorldLocation::transform_ptr_map;
 
@@ -13,7 +13,7 @@ namespace Sigma {
             auto position = getPosition(*it);
             auto transform = GetTransform(*it);
             if (transform) {
-				transform->TranslateTo(position->x, position->y, position->z);
+				transform->TranslateTo(position.x, position.y, position.z);
             }
         }
     }
