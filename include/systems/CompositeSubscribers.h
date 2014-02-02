@@ -17,7 +17,7 @@ namespace Sigma {
 
 	class CompositeSubscribers {
 	public:
-		CompositeSubscribers() : factory(FactorySystem::getInstance()) {};
+		CompositeSubscribers() {};
 		virtual ~CompositeSubscribers() {};
 
         /** \brief Add a composite removal to the queue
@@ -26,7 +26,7 @@ namespace Sigma {
          * \param cid CompositeID the composite to remove
          *
          */
-		void QueueAddEntity(id_t eid, CompositeID cid, const std::vector<Property>& properties) {
+		static void QueueAddEntity(id_t eid, CompositeID cid, const std::vector<Property>& properties) {
 			composite_entity_add_map.emplace(std::make_pair(CompositeID(cid), EntityProperty(eid, properties)));
 		}
 
@@ -36,7 +36,7 @@ namespace Sigma {
          * \param cid CompositeID the composite to add
          *
          */
-		void QueueRemoveEntity(id_t eid, CompositeID cid) {
+		static void QueueRemoveEntity(id_t eid, CompositeID cid) {
 			(composite_entity_rmqueue_map[cid])[eid] = true;
 		}
 
@@ -47,7 +47,7 @@ namespace Sigma {
          * \return bool true if the entity has the composite
          *
          */
-		bool HasComposite(id_t eid, CompositeID cid) {
+		static bool HasComposite(id_t eid, CompositeID cid) {
 			return composite_entity_map.count(cid) && (composite_entity_map.at(cid))[eid];
 		}
 
@@ -57,7 +57,7 @@ namespace Sigma {
          * \return BitArray<uint32_t>& the BitArray returned
          *
          */
-		const BitArray<uint32_t>& GetBitArray(CompositeID cid) const {
+		static BitArray<uint32_t>& GetBitArray(CompositeID cid) {
 			return composite_entity_map.at(cid);
 		}
 
@@ -66,7 +66,7 @@ namespace Sigma {
          * \param factory IFactory& the factory to register
          *
          */
-		void register_Factory(IFactory& f) {
+		static void register_Factory(IFactory& f) {
 			factory.register_Factory(f);
 		}
 
@@ -75,11 +75,11 @@ namespace Sigma {
          * \param factory IFactory& the factory to register
          *
          */
-		void register_ECSFactory(IECSFactory& f) {
+		static void register_ECSFactory(IECSFactory& f) {
 			factory.register_ECSFactory(f);
 		}
 
-		FactorySystem& GetFactory() {
+		static FactorySystem& GetFactory() {
 			return factory;
 		}
 
@@ -87,7 +87,7 @@ namespace Sigma {
         /** \brief Process the removal queue. Actually remove the composites
          *
          */
-		void ProcessRemoval() {
+		static void ProcessRemoval() {
 			// remove composites
 			for (auto itc = composite_entity_rmqueue_map.begin(), endc = composite_entity_rmqueue_map.end(); itc != endc; ++itc) {
 				for (auto ite = itc->second.begin(), endc = itc->second.end(); ite != endc; ++ite) {
@@ -101,7 +101,7 @@ namespace Sigma {
         /** \brief Process the addition queue. Actually add the composites
          *
          */
-		void ProcessAddition() {
+		static void ProcessAddition() {
 			// add composites
 			for (auto it = composite_entity_add_map.cbegin(), end = composite_entity_add_map.cend(); it != end; ++it) {
 				if (! factory.create(it->first, it->second.id, it->second.properties)) {
@@ -115,13 +115,13 @@ namespace Sigma {
 	private:
 		// A map of the id's of entities for each composite
 		// the id's are used as key in a bitset
-		std::unordered_map<CompositeID, BitArray<uint32_t>> composite_entity_map;
+		static std::unordered_map<CompositeID, BitArray<uint32_t>> composite_entity_map;
 		// The map used as queue before actually remove a composite from an entity
-		std::unordered_map<CompositeID, BitArray<uint32_t>> composite_entity_rmqueue_map;
+		static std::unordered_map<CompositeID, BitArray<uint32_t>> composite_entity_rmqueue_map;
 		// the map of properties queued to add
-		std::multimap<CompositeID, EntityProperty> composite_entity_add_map;
+		static std::multimap<CompositeID, EntityProperty> composite_entity_add_map;
 		// the reference to a factory
-		FactorySystem& factory;
+		static FactorySystem& factory;
 
 	};
 }
