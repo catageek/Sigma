@@ -163,7 +163,7 @@ namespace Sigma {
 	private:
 		static MapArray<position_type> pphysical;
 		static MapArray<orientation_type> ophysical;
-		static std::shared_ptr<BitArray<unsigned int>> updated_set;
+		static std::unique_ptr<BitArray<unsigned int>> updated_set;
 		static std::unordered_map<id_t, GLTransform> transform_map;
 		// we need this hack to keep a shared_ptr for each transform since SpatialComponent
 		// uses its own GLTransform or a shared one, so we must provide a shared_ptr

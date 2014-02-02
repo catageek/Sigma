@@ -4,6 +4,7 @@
 #include "systems/OpenALSystem.h"
 #include "systems/BulletPhysics.h"
 #include "systems/FactorySystem.h"
+#include "systems/CompositeSystem.h"
 #include "controllers/GUIController.h"
 #include "controllers/FPSCamera.h"
 #include "components/PhysicsController.h"
@@ -40,18 +41,19 @@ int main(int argCount, char **argValues) {
 	Sigma::OpenGLSystem glsys;
 	Sigma::OpenALSystem alsys;
 	Sigma::BulletPhysics bphys;
+	Sigma::CompositeSystem cpsys;
 	Sigma::Benchmark *benchmark;
 
-	Sigma::FactorySystem& factory = Sigma::FactorySystem::getInstance();
+	Sigma::FactorySystem& factory = cpsys.GetFactory();
 
 	// EntitySystem can add components
 	Sigma::EntitySystem entitySystem(&factory);
 
-	factory.register_Factory(glsys);
-	factory.register_Factory(alsys);
-	factory.register_Factory(bphys);
-	factory.register_ECSFactory(bphys);
-	factory.register_Factory(webguisys);
+	cpsys.register_Factory(glsys);
+	cpsys.register_Factory(alsys);
+	cpsys.register_Factory(bphys);
+	cpsys.register_ECSFactory(bphys);
+	cpsys.register_Factory(webguisys);
 
 	if (!glfwos.InitializeWindow(1024, 768, "Sigma GLFW Test Window")) {
 		std::cerr << "Failed creating the window or context." << std::endl;
@@ -98,7 +100,7 @@ int main(int argCount, char **argValues) {
 		auto arg2 = atoi(argValues[2]);
 		if (std::string(arg1).compare("-b") == 0 && arg2 > 0) {
 			benchmark = new Sigma::Benchmark(arg2);
-			benchmark->CreateEntities(factory);
+			benchmark->CreateEntities(&cpsys);
 		}
 	}
 
@@ -163,12 +165,12 @@ int main(int argCount, char **argValues) {
 					assert(0 && "Invalid entity id");
 				}
 			}
-
-			if (! factory.create(itr->type,e->id, const_cast<std::vector<Property>&>(itr->properties))) {
-				factory.createECS(itr->type,e->id, const_cast<std::vector<Property>&>(itr->properties));
-			};
+			cpsys.AddEntity(itr->type, e->id, const_cast<std::vector<Property>&>(itr->properties));
 		}
 	}
+
+	// We need to create entities now to create entity #1 and the view
+	cpsys.Update();
 
 	//////////////////////
 	// Setup user input //
@@ -272,6 +274,9 @@ int main(int argCount, char **argValues) {
 		///////////////////////
 		// Update subsystems //
 		///////////////////////
+
+		// Add or remove the composites
+		cpsys.Update();
 
 		// Pass in delta time in seconds
 		bphys.Update(deltaSec);

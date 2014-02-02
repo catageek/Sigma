@@ -10,6 +10,8 @@
 #include "Sigma.h"
 
 namespace Sigma {
+	class CompositeSystem;
+
 	class FactorySystem {
 		public:
 			DLL_EXPORT static FactorySystem& getInstance();
@@ -27,7 +29,7 @@ namespace Sigma {
 						const id_t entityID,
 						const std::vector<Property> &properties);
 
-			DLL_EXPORT std::vector<std::unique_ptr<IECSComponent>> createECS(const std::string& type,
+			DLL_EXPORT std::vector<std::unique_ptr<IECSComponent>> createECS(const CompositeID& type,
 							const id_t entityID,
 							const std::vector<Property> &properties);
 
@@ -61,6 +63,7 @@ namespace Sigma {
 
 			// the map of name-->factory for the ECS style components
 			std::unordered_map<std::string,IECSFactory::FactoryFunction> registeredECSFactoryFunctions;
+
 	}; // class FactorySystem
 
 } // namespace Sigma
