@@ -37,9 +37,6 @@ namespace Sigma {
 		 */
 		DLL_EXPORT bool Update(const double delta);
 
-		DLL_EXPORT IComponent* createBulletShapeMesh(const id_t entityID, const std::vector<Property> &properties);
-		DLL_EXPORT IComponent* createBulletShapeSphere(const id_t entityID, const std::vector<Property> &properties);
-
 		void addControllableMove(const id_t entityID, const std::vector<Property> &properties);
 		void addInterpolatedMove(const id_t entityID, const std::vector<Property> &properties);
 		void addPhysicalWorldLocation(const id_t entityID, const std::vector<Property> &properties);
