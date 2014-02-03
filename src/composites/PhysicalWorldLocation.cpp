@@ -33,33 +33,33 @@ namespace Sigma {
 	}
 
 	void PhysicalWorldLocation::AddEntity(const id_t id, const std::vector<Property> &properties) {
-		float x = 0.0f;
-		float y = 0.0f;
-		float z = 0.0f;
-		float rx = 0.0f;
-		float ry = 0.0f;
-		float rz = 0.0f;
+		btScalar x = 0.0f;
+		btScalar y = 0.0f;
+		btScalar z = 0.0f;
+		btScalar rx = 0.0f;
+		btScalar ry = 0.0f;
+		btScalar rz = 0.0f;
 
 		for (auto propitr = properties.begin(); propitr != properties.end(); ++propitr) {
 			const Property*  p = &*propitr;
 
 			if (p->GetName() == "x") {
-				x = p->Get<float>();
+				x = p->Get<btScalar>();
 			}
 			else if (p->GetName() == "y") {
-				y = p->Get<float>();
+				y = p->Get<btScalar>();
 			}
 			else if (p->GetName() == "z") {
-				z = p->Get<float>();
+				z = p->Get<btScalar>();
 			}
 			else if (p->GetName() == "rx") {
-				rx = p->Get<float>();
+				rx = btRadians(p->Get<btScalar>());
 			}
 			else if (p->GetName() == "ry") {
-				ry = p->Get<float>();
+				ry = btRadians(p->Get<btScalar>());
 			}
 			else if (p->GetName() == "rz") {
-				rz = p->Get<float>();
+				rz = btRadians(p->Get<btScalar>());
 			}
 		}
 		AddEntityPosition(id, x, y, z, rx, ry, rz);

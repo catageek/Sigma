@@ -9,6 +9,7 @@
 #include "IComponent.h"
 #include "components/SigmaMotionState.h"
 #include "IECSComponent.h"
+#include <bullet/btBulletCollisionCommon.h>
 #include <map>
 #include <unordered_map>
 #include <memory>
