@@ -117,6 +117,7 @@ int main(int argCount, char **argValues) {
 	properties.push_back(v);
 	properties.emplace_back(Property("radius", 0.3f));
 	properties.emplace_back(Property("height", 1.3f));
+	properties.emplace_back(Property("mass", 1.0f));
 	Sigma::BulletMover mover(1, properties);
 	mover.InitializeRigidBody(properties);
 

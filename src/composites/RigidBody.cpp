@@ -7,6 +7,7 @@ namespace Sigma {
 
 	void RigidBody::AddEntity(const id_t id, const std::vector<Property> &properties) {
 		btCollisionShape* shape = nullptr;
+		btScalar mass = 0;
 		std::string shape_type;
 
 		for (auto propitr = properties.begin(); propitr != properties.end(); ++propitr) {
@@ -15,6 +16,9 @@ namespace Sigma {
 			if (p->GetName() == "shape") {
 				shape_type = p->Get<std::string>();
 				break;
+			}
+			if (p->GetName() == "mass") {
+				mass = p->Get<btScalar>();
 			}
 		}
 
@@ -73,12 +77,16 @@ namespace Sigma {
 		if (! shape) {
 			assert(0 && "Invalid shape type");
 		}
-		btScalar mass = 1;
+
 		btVector3 fallInertia(0,0,0);
 		auto motionState =	PhysicalWorldLocation::GetMotionState(id);
 		btRigidBody::btRigidBodyConstructionInfo fallRigidBodyCI(mass, motionState, shape,fallInertia);
 		shape->calculateLocalInertia(mass,fallInertia);
-		body_map[id] = new btRigidBody(fallRigidBodyCI);
+		auto b = new btRigidBody(fallRigidBodyCI);
+		b->setContactProcessingThreshold(BT_LARGE_FLOAT);
+		b->setCcdMotionThreshold(.5);
+		b->setCcdSweptSphereRadius(0);
+		body_map[id] = b;
 		// add the body to the world
 		dynamicsWorld->addRigidBody(body_map.at(id));
 	}
