@@ -39,7 +39,7 @@ namespace Sigma{
 							const id_t entityID,
 							const std::vector<Property> &properties){
 		if(registeredECSFactoryFunctions.find(type) != registeredECSFactoryFunctions.end()){
-			std::cerr << "Creating ECS component of type: " << type << std::endl;
+			std::cerr << "Creating ECS component of type: " << type << " with id #" << entityID << std::endl;
 			registeredECSFactoryFunctions[type](entityID, properties);
 		}
 		else {
