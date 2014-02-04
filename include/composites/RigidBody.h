@@ -9,6 +9,7 @@
 #include "components/BulletShapeMesh.h"
 #include "resources/Mesh.h"
 #include "MapArray.hpp"
+#include "systems/OpenGLSystem.h"
 
 namespace Sigma {
 	/** \brief A component for entities that have a rigid body

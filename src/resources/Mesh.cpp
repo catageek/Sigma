@@ -442,7 +442,7 @@ namespace Sigma{
 		this->verts.push_back(v);
 	}
 
-	const Vertex* Mesh::GetVertex(const unsigned int index) const {
+	const Vertex* Mesh::GetVertex(const size_t index) const {
 		if(index < this->verts.size()) {
 			return &this->verts[index];
 		}

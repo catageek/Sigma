@@ -1,8 +1,8 @@
 #include "systems/FactorySystem.h"
 #include "systems/CompositeSystem.h"
+#include "Sigma.h"
 
 namespace Sigma{
-
 	std::shared_ptr<FactorySystem> FactorySystem::_instance;
 
 	FactorySystem::FactorySystem() {
@@ -27,7 +27,7 @@ namespace Sigma{
 							   const id_t entityID,
 							   const std::vector<Property> &properties){
 		if(registeredFactoryFunctions.find(type) != registeredFactoryFunctions.end()){
-			std::cerr << "Creating component of type: " << type << std::endl;
+			LOG << "Creating component of type: " << type;
 			return registeredFactoryFunctions[type](entityID, properties);
 		}
 		else {
@@ -50,7 +50,7 @@ namespace Sigma{
 	void FactorySystem::register_Factory(IFactory& Factory){
 		const auto& factoryfunctions = Factory.getFactoryFunctions();
 		for(auto FactoryFunc = factoryfunctions.begin(); FactoryFunc != factoryfunctions.end(); ++FactoryFunc){
-			std::cerr << "Registering component factory of type: " << FactoryFunc->first << std::endl;
+			LOG << "Registering component factory of type: " << FactoryFunc->first;
 			registeredFactoryFunctions[FactoryFunc->first]=FactoryFunc->second;
 		}
 	}
