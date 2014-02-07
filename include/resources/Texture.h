@@ -9,18 +9,20 @@
 #include <cassert>
 
 #include "SOIL/SOIL.h"
+#include "systems/ResourceSsytem.h"
 
 namespace Sigma {
 	namespace resource {
 		/**
 		 * Represents a OpenGL Texture
 		 */
-		class GLTexture {
+		class Texture {
 		public:
-			GLTexture() : id(0), autogen_mipmaps(true) { 
+			Texture() : id(0), autogen_mipmaps(true) { 
+				glGenTextures(1, &this->id);
 				int_format = GL_RGBA8;           /// Internal format in the GPU
 
-				// Note: Prefered format of the GPU could be get using ARB_internalformat_query2 extension  :
+				// Note: Preferred format of the GPU could be get using ARB_internalformat_query2 extension  :
 				// glGetInternalFormativ(GL_TEXTURE_2D, GL_RGBA8, GL_TEXTURE_IMAGE_FORMAT, 1, &preferred_format)
 				// But using this could required adapting the Texture to this format
 				format     = GL_RGBA;            /// Pixel data format (format of the loaded data)
@@ -31,7 +33,7 @@ namespace Sigma {
 				wrap_r      = GL_REPEAT;          /// Sets the wrap parameter for texture
 
 				mag_filter  = GL_LINEAR;          /// Filter using when magnify texture
-				min_filter  = GL_LINEAR_MIPMAP_LINEAR;          /// Filter using when minmise texture
+				min_filter  = GL_LINEAR_MIPMAP_LINEAR;          /// Filter using when minimize texture
 
 			}
 
@@ -39,6 +41,9 @@ namespace Sigma {
 			 * Generates a empty texture of the desired size
 			 */
 			void GenerateGLTexture(unsigned int width, unsigned int height) {
+				if (this->id > 0) {
+					glDeleteTextures(1, &this->id);
+				}
 				glGenTextures(1, &this->id);
 				this->width = width;
 				this->height = height;
@@ -51,16 +56,12 @@ namespace Sigma {
 			}
 
 			/**
-			 * Loads and crete a texture from a bitmap in RAM
+			 * Loads and create a texture from a bitmap in RAM
 			 * \param data Ptr. to the bitmap
 			 * \param width
 			 * \param height
 			 */
 			void LoadDataFromMemory(const unsigned char* data, unsigned int width, unsigned int height) {
-				if (id == 0) {
-					glGenTextures(1, &this->id);
-				}
-
 				this->width = width;
 				this->height = height;
 
@@ -84,7 +85,7 @@ namespace Sigma {
 
 			/**
 			 * \brief Updates a texture data from a bitmap in RAM.
-			 * REQUIRES a previus call of LoadDataFromFile or LoadDataFromMemory
+			 * REQUIRES a previous call of Load or LoadDataFromMemory
 			 * The bitmap MUST have the same size that the texture.
 			 * \param data Ptr. to the bitmap
 			 */
@@ -105,12 +106,12 @@ namespace Sigma {
 			 * \param filename Path to the image file
 			 * \param options Struct that defines the format of the bitmap and how the GPU will interpret it
 			 */
-			void LoadDataFromFile(const std::string& filename) {
+			bool Load(const std::string& filename) {
 				int width, height, channels;
 				unsigned char* data = SOIL_load_image(filename.c_str(), &width, &height, &channels, false);
 
 				if (data) {
-					// Invert Y (necesary!)
+					// Invert Y (necessary!)
 					int i, j;
 					for( j = 0; j*2 < height; ++j ) {
 						int index1 = j * width * channels;
@@ -133,6 +134,11 @@ namespace Sigma {
 					LoadDataFromMemory(data, width, height);
 					delete data;
 				}
+
+				if (id == 0) {
+					return false;
+				}
+				return true;
 			}
 
 			unsigned int GetID() const { return id; }
@@ -248,8 +254,10 @@ namespace Sigma {
 			bool autogen_mipmaps; /// Should autogenerate mipmaps ?
 
 			GLint mag_filter;     /// Filter using when magnify texture
-			GLint min_filter;     /// Filter using when minmise texture
-
+			GLint min_filter;     /// Filter using when minimize texture
 		};
+
+		template <> inline const char* GetTypeName<Texture>() { return "Texture"; }
+		template <> inline const unsigned int GetTypeID<Texture>() { return 1001; }
 	}
 }

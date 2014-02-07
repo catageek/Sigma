@@ -17,10 +17,11 @@
 #include "components/Renderable.h"
 #include "systems/IGLView.h"
 #include <vector>
-#include "resources/GLTexture.h"
+#include "resources/Texture.h"
 #include "resources/GLScreenQuad.h"
 #include "Sigma.h"
 #include "composites/PhysicalWorldLocation.h"
+#include "ResourceSsytem.h"
 
 struct IGLView;
 
@@ -46,8 +47,7 @@ namespace Sigma{
 		void UnbindRead();
 	};
 
-	class OpenGLSystem
-		: public Sigma::IFactory, public ISystem<IComponent> {
+	class OpenGLSystem : public IFactory, public ISystem<IComponent> {
 	public:
 
 		DLL_EXPORT OpenGLSystem();
@@ -162,9 +162,6 @@ namespace Sigma{
 		}
 
 		DLL_EXPORT GLTransform* GetTransformFor(const unsigned int entityID);
-
-		static std::map<std::string, Sigma::resource::GLTexture> textures;
-		static std::map<std::string, std::shared_ptr<Mesh>> meshes;
 	private:
 		unsigned int windowWidth; // Store the width of our window
 		unsigned int windowHeight; // Store the height of our window
@@ -186,6 +183,8 @@ namespace Sigma{
 		std::vector<std::unique_ptr<RenderTarget>> renderTargets;
 
 		std::vector<std::unique_ptr<Renderable>> screensSpaceComp; // A vector that holds only screen space components. These are rendered separately.
+
+		std::shared_ptr<resource::ResourceSystem> resSystem;
 	}; // class OpenGLSystem
 } // namespace Sigma
 #endif // OPENGLSYSTEM_H

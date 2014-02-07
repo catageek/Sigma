@@ -16,9 +16,9 @@ namespace Sigma {
 	WebGUISystem::WebGUISystem() { }
 	WebGUISystem::~WebGUISystem() { }
 
-	std::map<std::string,Sigma::IFactory::FactoryFunction> WebGUISystem::getFactoryFunctions() {
+	std::map<std::string,IFactory::FactoryFunction> WebGUISystem::getFactoryFunctions() {
 		using namespace std::placeholders;
-		std::map<std::string,Sigma::IFactory::FactoryFunction> retval;
+		std::map<std::string,IFactory::FactoryFunction> retval;
 		retval["WebGUIView"] = std::bind(&WebGUISystem::createWebGUIView,this,_1,_2);
 
 		return retval;
@@ -29,6 +29,7 @@ namespace Sigma {
 		LOG << "Setting up web view.";
 		CefRefPtr<WebGUISystem> ourselves(this);
 		CefSettings settings;
+		settings.multi_threaded_message_loop = false;
 #ifdef CEFDEV
 		CefInitialize(mainArgs, settings, ourselves.get(), nullptr);
 #else
@@ -84,19 +85,13 @@ namespace Sigma {
 		}
 #endif
 
-		// Check if the texture is loaded and load it if not.
-		if (Sigma::OpenGLSystem::textures.find(textureName) == Sigma::OpenGLSystem::textures.end()) {
-			Sigma::resource::GLTexture texture;
-			Sigma::OpenGLSystem::textures[textureName] = texture;
-			Sigma::OpenGLSystem::textures[textureName].Format(GL_BGRA);
-			Sigma::OpenGLSystem::textures[textureName].GenerateGLTexture(this->windowWidth, this->windowHeight);
+		std::shared_ptr<resource::Texture> texture = resource::ResourceSystem::GetInstace()->Get<resource::Texture>(textureName);
+		if (texture->GetID() == 0) {
+			texture->Format(GL_BGRA);
+			texture->GenerateGLTexture(this->windowWidth, this->windowHeight);
 		}
-
-		// It should be loaded, but in case an error occurred double check for it.
-		if (Sigma::OpenGLSystem::textures.find(textureName) != Sigma::OpenGLSystem::textures.end()) {
-			webview->SetTexture(&Sigma::OpenGLSystem::textures[textureName]);
-		}
-
+		
+		webview->SetTexture(texture);
 		webview->SetCaputeArea(x, y, width, height);
 		webview->SetWindowSize(this->windowWidth, this->windowHeight);
 		this->addComponent(entityID, webview);
@@ -107,7 +102,7 @@ namespace Sigma {
 		windowInfo.SetTransparentPainting(transparent);
 
 		CefBrowserSettings settings;
-		CefRefPtr<Sigma::WebGUIView> client(webview);
+		CefRefPtr<WebGUIView> client(webview);
 		CefBrowserHost::CreateBrowser(windowInfo, client.get(), url, settings, nullptr);
 #endif
 		return webview;
