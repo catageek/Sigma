@@ -82,6 +82,7 @@ namespace Sigma {
 
 		static void setPosition(const id_t id, const position_type& vec) {
 			pphysical.at(id) = vec;
+			MarkUpdated(id);
 		}
 
 		static orientation_type& getOrientation(const id_t id) {
