@@ -56,9 +56,9 @@ namespace Sigma {
 
 		void clear(const id_t id) {}; // TODO
 
-		MapArrayIterator<T> begin() { return MapArrayIterator<T>(map_array.cbegin(), map_array.cend()); };
+		MapArrayIterator<T> begin() { return MapArrayIterator<T>(map_array.begin(), map_array.cend()); };
 
-		MapArrayIterator<T> end() { return MapArrayIterator<T>(map_array.cend()); };
+		MapArrayIterator<T> end() { return MapArrayIterator<T>(map_array.end()); };
 
         /** \brief Return a reference on the chunk containing the data of a specific entity
          *
@@ -114,8 +114,8 @@ namespace Sigma {
          * \param std::map<id_t,Chunk<T>>::const_iterator& end an iterator on the past-the-end element of the internal map
          *
          */
-		MapArrayIterator(const typename std::map<id_t, Chunk<T>>::const_iterator& chunk_iterator, const typename std::map<id_t, Chunk<T>>::const_iterator& chunk_end)
-			: chunk_iterator(chunk_iterator), chunk_end(chunk_end) {
+		MapArrayIterator(const typename std::map<id_t, Chunk<T>>::iterator& chunk_iterator, const typename std::map<id_t, Chunk<T>>::const_iterator& chunk_end)
+			: chunk_iterator(chunk_iterator), chunk_end(chunk_end), tmp_pair(std::make_pair(0, std::ref(ref_T))) {
 			if (chunk_iterator != chunk_end) {
 				p = chunk_iterator->first << CONTAINER_CHUNK_SHIFT;
 			}
@@ -126,7 +126,8 @@ namespace Sigma {
          * \param std::map<id_t,Chunk<T>>::const_iterator& end an iterator on the past-the-end element of the internal map
          *
          */
-		MapArrayIterator(const typename std::map<id_t, Chunk<T>>::const_iterator& chunk_end) : chunk_iterator(chunk_end), chunk_end(chunk_end) {};
+		MapArrayIterator(const typename std::map<id_t, Chunk<T>>::iterator& chunk_end)
+			: chunk_iterator(chunk_end), chunk_end(chunk_end), tmp_pair(std::make_pair(0, std::ref(ref_T))) {};
 
         /** \brief Default destructor
          *
@@ -136,7 +137,7 @@ namespace Sigma {
         /** \brief Copy constructor
          *
          */
-		MapArrayIterator(const MapArrayIterator<T>& it) : chunk_iterator(it.chunk_iterator), chunk_end(it.chunk_end) {
+		MapArrayIterator(const MapArrayIterator<T>& it) : chunk_iterator(it.chunk_iterator), chunk_end(it.chunk_end), tmp_pair(it.tmp_pair) {
 			if (chunk_iterator != chunk_end) {
 				p = it.p;
 			}
@@ -154,7 +155,13 @@ namespace Sigma {
 		bool operator==(const MapArrayIterator<T>& mai) const {return (chunk_iterator == mai.chunk_iterator) && ((chunk_iterator == chunk_end) ||(p == mai.p)); };
 		bool operator!=(const MapArrayIterator<T>& mai) const { return ! (*this == mai); };
 		std::pair<id_t,T>& operator*() { return std::make_pair(p, chunk_iterator->second.data[MapArray<T>::Index(p)]); };
-		std::pair<id_t,T>* operator->() { tmp_pair = std::make_pair(p, chunk_iterator->second.data[MapArray<T>::Index(p)]); return &tmp_pair; };
+
+		std::pair<id_t,std::reference_wrapper<T>>* operator->() {
+			auto ref = &chunk_iterator->second.data[MapArray<T>::Index(p)];
+			tmp_pair.first = p;
+			tmp_pair.second = std::ref(*ref);
+			return &tmp_pair;
+		};
 
 	private:
 		// post increment is private because I am lazy
@@ -162,10 +169,11 @@ namespace Sigma {
 		// cuurent position of the iterator
 		id_t p;
 		// iterators on the internal map
-		typename std::map<id_t, Chunk<T>>::const_iterator chunk_iterator;
+		typename std::map<id_t, Chunk<T>>::iterator chunk_iterator;
 		typename std::map<id_t, Chunk<T>>::const_iterator chunk_end;
+		T ref_T;
 		// placeholder for returned value of dereference operator
-		std::pair<id_t,T> tmp_pair;
+		std::pair<id_t,std::reference_wrapper<T>> tmp_pair;
 	};
 }
 

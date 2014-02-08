@@ -16,10 +16,10 @@ namespace Sigma {
             auto transform = PhysicalWorldLocation::GetTransform(id);
             if (transform != nullptr) {
                 glm::vec3 t;
-                for (auto forceitr = f_it->second.begin(); forceitr != f_it->second.end(); ++forceitr) {
+                for (auto forceitr = f_it->second.get().begin(); forceitr != f_it->second.get().end(); ++forceitr) {
                     t += *forceitr;
                 }
-                cf_it->second = (t.z * transform->GetForward()) +
+                cf_it->second.get() = (t.z * transform->GetForward()) +
                            (t.y * transform->GetUp()) +
                            (t.x * transform->GetRight());
             }
@@ -31,7 +31,7 @@ namespace Sigma {
         for (auto cf_it = cumulatedForces_map.begin(); cf_it != cumulatedForces_map.end(); ++cf_it) {
 			auto id = cf_it->first;
             auto body = RigidBody::getBody(id);
-            auto finalForce = cf_it->second;
+            auto finalForce = cf_it->second.get();
             if (CompositeSubscribers::HasComposite(id, "RigidBody")) {
                 body->setLinearVelocity(btVector3(finalForce.x, body->getLinearVelocity().y() + 0.000000001f, finalForce.z));
             }

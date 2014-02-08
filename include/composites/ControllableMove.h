@@ -67,13 +67,13 @@ namespace Sigma {
 		 *
 		 */
 		static void AddForce(const id_t id, glm::vec3 force) {
-			auto forces = getForces(id);
-			for (auto forceitr = forces.begin(); forceitr != forces.end(); ++forceitr) {
+			auto forces = &getForces(id);
+			for (auto forceitr = forces->begin(); forceitr != forces->end(); ++forceitr) {
 				if ((*forceitr) == force) {
 					return;
 				}
 			}
-			forces.push_back(force);
+			forces->push_back(force);
 		}
 
 		/**
@@ -83,8 +83,8 @@ namespace Sigma {
 		 * \param glm::vec3 force The force to remove. Is is evaluated based on glm's comparisson.
 		 */
 		static void RemoveForce(const id_t id, const glm::vec3& force) {
-			auto forces = getForces(id);
-			forces.remove(force);
+			auto forces = &getForces(id);
+			forces->remove(force);
 		}
 
 		static void AddRotationForce(const id_t id, const glm::vec3 rotation) {
@@ -108,8 +108,8 @@ namespace Sigma {
 		 * \param id const id_t the id of the entity
 		 */
 		static void ClearForces(const id_t id) {
-			auto forces = getForces(id);
-			forces.clear();
+			auto forces = &getForces(id);
+			forces->clear();
 
 			auto rotationForces = getRotationForces(id);
 			rotationForces->clear();
