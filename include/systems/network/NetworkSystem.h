@@ -2,8 +2,8 @@
 #define NETWORKSYSTEM_H_INCLUDED
 
 #include "Sigma.h"
-#include "systems/IOWorker.h"
-#include "systems/IOPoller.h"
+#include "systems/network/IOWorker.h"
+#include "systems/network/IOPoller.h"
 
 namespace network {
 	class TCPConnection;

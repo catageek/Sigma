@@ -1,8 +1,8 @@
 #include <vector>
-#include "systems/IOWorker.h"
+#include "systems/network/IOWorker.h"
 #include "Log.h"
 #include "sys/event.h"
-#include "systems/IOPoller.h"
+#include "systems/network/IOPoller.h"
 
 using namespace network;
 
@@ -45,11 +45,8 @@ namespace Sigma {
 					c.Send("welcome!\n");
 				}
 				else if (evList[i].flags & EVFILT_READ) {
-					LOG_DEBUG << "receive data from fd " << evList[i].ident;
 					std::string buf;
-					TCPConnection c(evList[i].ident, NETA_IPv4, SCS_CONNECTED);
-					LOG_DEBUG << "connected ? " << c.IsConnected();
-					auto len = c.Recv(buf, 64);
+					auto len = TCPConnection(evList[i].ident, NETA_IPv4, SCS_CONNECTED).Recv(buf, 64);
 					LOG_DEBUG << "received " << len << " bytes";
 				}
 			}

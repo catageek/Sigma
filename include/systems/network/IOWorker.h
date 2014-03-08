@@ -12,10 +12,7 @@ namespace Sigma {
 		IOWorker(IOPoller& p) : poller(&p) {};
 		virtual ~IOWorker() {};
 
-		IOWorker(IOWorker&& w) {
-			this->ssocket = std::move(w.ssocket);
-			this->poller = std::move(w.poller);
-		};
+		IOWorker(IOWorker&& w) : poller(std::move(w.poller)), ssocket(std::move(w.ssocket)) {};
 
         /** \brief Event Dispatcher Loop
 		 *
@@ -34,7 +31,7 @@ namespace Sigma {
 
 	private:
 		std::unique_ptr<network::TCPConnection> ssocket;	// the listening socket
-		IOPoller* poller;									// the kqueue poller
+		IOPoller* const poller;									// the kqueue poller
 	};
 }
 

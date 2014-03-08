@@ -13,7 +13,7 @@
 #include "systems/WebGUISystem.h"
 #include "OS.h"
 #include "components/SpotLight.h"
-#include "systems/NetworkSystem.h"
+#include "systems/network/NetworkSystem.h"
 
 #ifdef _WIN32
 #include <windows.h>

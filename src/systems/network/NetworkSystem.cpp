@@ -1,4 +1,4 @@
-#include "systems/NetworkSystem.h"
+#include "systems/network/NetworkSystem.h"
 
 #include <thread>
 #include <chrono>

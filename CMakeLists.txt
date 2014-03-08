@@ -65,7 +65,7 @@ source_group("Source Files\\entities" FILES ${Sigma_SRC_ENTITY_CPP})
 # Put all Systems files into a filter
 file(GLOB Sigma_SRC_SYSTEM_H "include/systems/*.h")
 source_group("Header Files\\systems" FILES ${Sigma_SRC_SYSTEM_H})
-file(GLOB Sigma_SRC_SYSTEM_CPP "src/systems/*.cpp")
+file(GLOB_RECURSE Sigma_SRC_SYSTEM_CPP "src/systems/*.cpp")
 source_group("Source Files\\systems" FILES ${Sigma_SRC_SYSTEM_CPP})
 
 # Put all Controller files into a filter
