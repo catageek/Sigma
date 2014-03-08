@@ -12,7 +12,7 @@ SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/modules")
 ### download repo from github and build libkqueue
 INCLUDE(Buildlibkqueue)
 
-### download repo from github and build libkqueue
+### download repo from github and build nanomsg
 INCLUDE(Buildnanomsg)
 
 # Set the include directory
