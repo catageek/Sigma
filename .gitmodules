@@ -1,0 +1,7 @@
+[submodule "cppnanomsg"]
+	path = cppnanomsg
+	url = https://github.com/nanomsg/cppnanomsg
+[submodule "netport"]
+	path = netport
+	url = https://github.com/catageek/NetPort.git
+	branch = develop

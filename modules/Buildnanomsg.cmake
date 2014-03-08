@@ -1,0 +1,25 @@
+PROJECT(nanomsg)
+include(ExternalProject)
+
+set(NANOMSG_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/nanomsg")
+set(NANOMSG_BINARY_DIR "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+set(NANOMSG_LIBRARIES libnanomsg.so)
+
+IF(UNIX)
+  SET(NANOSMSG_CONFIGURE_COMMAND ./autogen.sh && ./configure --prefix=${NANOMSG_BINARY_DIR})
+ENDIF(UNIX)
+
+ExternalProject_Add(nanomsg_project
+  PREFIX ${NANOMSG_PREFIX}
+  GIT_REPOSITORY https://github.com/nanomsg/nanomsg
+  UPDATE_COMMAND ""
+  BUILD_IN_SOURCE 1
+  CONFIGURE_COMMAND ${NANOSMSG_CONFIGURE_COMMAND}
+  INSTALL_DIR ${NANOMSG_BINARY_DIR}
+  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${NANOMSG_BINARY_DIR}
+#  INSTALL_COMMAND ""
+)
+
+add_library(nanomsg SHARED IMPORTED)
+set_property(TARGET nanomsg PROPERTY IMPORTED_LOCATION ${NANOMSG_BINARY_DIR})
+add_dependencies(nanomsg nanomsg_project)

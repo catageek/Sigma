@@ -1,12 +1,27 @@
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8)
 PROJECT (Sigma)
 
+set(CMAKE_CXX_FLAGS "-ggdb")
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
+# Set the directory of Find<Library>.cmake modules
+SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/modules")
+
+### download repo from github and build libkqueue
+INCLUDE(Buildlibkqueue)
+
+### download repo from github and build libkqueue
+INCLUDE(Buildnanomsg)
+
 # Set the include directory
 INCLUDE_DIRECTORIES(
 	${CMAKE_SOURCE_DIR}
 	${CMAKE_SOURCE_DIR}/include
 	${CMAKE_SOURCE_DIR}/cef
 	${CMAKE_SOURCE_DIR}/cef/include
+	${CMAKE_SOURCE_DIR}/netport/include
 	)
 
 # Set the cmake search paths
@@ -17,9 +32,6 @@ SET(CMAKE_INCLUDE_PATH
 
 # change output directory of executable so that relative paths in the code are correct
 SET(EXECUTABLE_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/build/bin)
-
-# Set the directory of Find<Library>.cmake modules
-SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/modules")
 
 # find all source files in the src directory
 FILE(GLOB Sigma_SRC "src/*.cpp")
@@ -67,6 +79,10 @@ file(GLOB Sigma_SRC_RESOURCES_H "include/resources/*.h")
 source_group("Header Files\\resources" FILES ${Sigma_SRC_RESOURCES_H})
 file(GLOB Sigma_SRC_RESOURCES_CPP "src/resources/*.cpp")
 source_group("Source Files\\resources" FILES ${Sigma_SRC_RESOURCES_CPP})
+
+# Put all NetPort files into a filter.
+FILE(GLOB Sigma_SRC_NETPORT_CPP "netport/src/*.cpp")
+SOURCE_GROUP("Source Files\\netport" FILES ${Sigma_SRC_NETPORT_CPP})
 
 # Put the Test files into a filter
 FILE(GLOB Sigma_SRC_TESTS_CPP "src/tests/*.cpp")
@@ -212,6 +228,8 @@ set(Sigma_ALL_LIBS
 	${BULLET_COLLISION_LIBRARIES}
 	${BULLET_DYNAMICS_LIBRARIES}
 	${CEF_LIBRARIES}
+	${NANOMSG_LIBRARIES}
+	${LIBKQUEUE_LIBRARIES}
 	)
 
 # all source common to the library and test exe
@@ -222,6 +240,7 @@ set(Sigma_ALL_SOURCE
 	${Sigma_SRC_SYSTEM_CPP}
 	${Sigma_SRC_CONTROLLERS_CPP}
 	${Sigma_SRC_RESOURCES_CPP}
+	${Sigma_SRC_NETPORT_CPP}
 	${Sigma_SRC_ENTITY_CPP}
 	)
 
@@ -236,10 +255,8 @@ set(Sigma_ALL_INCLUDES
 	${Sigma_SRC_ENTITY_H}
 	)
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-
 LINK_DIRECTORIES("${CMAKE_SOURCE_DIR}/cef")
+LINK_DIRECTORIES("${CMAKE_BINARY_DIR}/bin/lib")
 # For CEF these may or may not work depending on the platform/build config, including anyway
 LINK_DIRECTORIES("${CMAKE_BINARY_DIR}/bin")
 LINK_DIRECTORIES("${EXECUTABLE_OUTPUT_PATH}")
@@ -249,6 +266,7 @@ if(BUILD_STATIC_Sigma)
 		${Sigma_ALL_SOURCE}
 		${Sigma_ALL_INCLUDES}
 		)
+	add_dependencies(libSigmas libkqueue nanomsg)
 	# Link the Sigma lib to all required external libraries
 	TARGET_LINK_LIBRARIES(libSigmas ${Sigma_ALL_LIBS})
 	if(WIN32)
@@ -267,6 +285,7 @@ if(BUILD_SHARED_Sigma)
 		${Sigma_ALL_SOURCE}
 		${Sigma_ALL_INCLUDES}
 		)
+	add_dependencies(libSigma libkqueue nanomsg)
 	# Link the Sigma lib to all required external libraries
 	TARGET_LINK_LIBRARIES(libSigma ${Sigma_ALL_LIBS})
 	set_target_properties(libSigma PROPERTIES
@@ -310,6 +329,7 @@ if(BUILD_EXE_Sigma)
 				${Sigma_ALL_INCLUDES}
 				${TEST_CPP}
 				)
+			add_dependencies(${TEST_NAME} libkqueue nanomsg)
 			# Link the executable to all required libraries
 			TARGET_LINK_LIBRARIES(${TEST_NAME} ${Sigma_ALL_LIBS})
 		endif(BUILD_STATIC_Sigma)
