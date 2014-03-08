@@ -3,6 +3,7 @@
 #include "Log.h"
 #include "sys/event.h"
 #include "systems/network/IOPoller.h"
+#include "systems/network/AuthWorker.h"
 
 using namespace network;
 
@@ -45,9 +46,11 @@ namespace Sigma {
 					c.Send("welcome!\n");
 				}
 				else if (evList[i].flags & EVFILT_READ) {
-					std::string buf;
-					auto len = TCPConnection(evList[i].ident, NETA_IPv4, SCS_CONNECTED).Recv(buf, 64);
+					AuthenticationPacket packet;
+					auto len = TCPConnection(evList[i].ident, NETA_IPv4, SCS_CONNECTED).Recv(packet.buffer, 32);
 					LOG_DEBUG << "received " << len << " bytes";
+					auto rep = AuthWorker().Authenticate(&packet);
+					LOG_DEBUG << "authenticator reply: " << rep;
 				}
 			}
 		}
