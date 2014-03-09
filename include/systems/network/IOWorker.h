@@ -19,7 +19,7 @@ namespace Sigma {
 		 * IOWorkers must return here
          *
          */
-		void watch();
+		void Work();
 
         /** \brief Function to begin the Event Dispatcher loop
          *
@@ -32,6 +32,7 @@ namespace Sigma {
 	private:
 		std::unique_ptr<network::TCPConnection> ssocket;	// the listening socket
 		IOPoller* const poller;									// the kqueue poller
+
 	};
 }
 

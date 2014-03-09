@@ -4,6 +4,7 @@
 #include "sys/event.h"
 #include "systems/network/IOPoller.h"
 #include "systems/network/AuthWorker.h"
+#include "systems/network/NetworkSystem.h"
 
 using namespace network;
 
@@ -11,10 +12,10 @@ namespace Sigma {
 	void IOWorker::watch_start(std::unique_ptr<TCPConnection>&& server_port) {
 		poller->Watch(server_port->Handle());
 		ssocket = std::move(server_port);
-		watch();
+		Work();
 	}
 
-	void IOWorker::watch() {
+	void IOWorker::Work() {
 		std::vector<struct kevent> evList(32);
 		while (1) {
 			auto nev = poller->Poll(evList, nullptr);
@@ -23,8 +24,8 @@ namespace Sigma {
 			}
 			LOG_DEBUG << "got " << nev << " events";
 			for (auto i=0; i<nev; i++) {
+				auto fd = evList[i].ident;
 				if (evList[i].flags & EV_EOF) {
-					auto fd = evList[i].ident;
 					LOG_DEBUG << "disconnect " << fd;
 					poller->Unwatch(fd);
 					TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Close();
@@ -35,7 +36,7 @@ namespace Sigma {
 					continue;
 				}
 
-				if (evList[i].ident == ssocket->Handle()) {
+				if (fd == ssocket->Handle()) {
 					TCPConnection c;
 					if (! ssocket->Accept(&c)) {
 						LOG_ERROR << "Could not accept connection, handle is " << ssocket->Handle();
@@ -44,14 +45,20 @@ namespace Sigma {
 					poller->Watch(c.Handle());
 					LOG_DEBUG << "connect " << c.Handle();
 					c.Send("welcome!\n");
+					NetworkSystem::GetPendingQueue()->Add(c.Handle());
 				}
 				else if (evList[i].flags & EVFILT_READ) {
-					AuthenticationPacket packet;
-					auto len = TCPConnection(evList[i].ident, NETA_IPv4, SCS_CONNECTED).Recv(packet.buffer, 32);
-					LOG_DEBUG << "received " << len << " bytes";
-					auto rep = AuthWorker().Authenticate(&packet);
-					LOG_DEBUG << "authenticator reply: " << rep;
+					// Data received
+					if (NetworkSystem::GetPendingQueue()->Exist(fd)) {
+						// Data received, not authenticated
+						NetworkSystem::GetAuthRequestQueue()->Add(fd);
+					}
+					else {
+						// Data received from authenticated client
+						NetworkSystem::GetDataRecvQueue()->Add(fd);
+					}
 				}
+				AuthWorker().Work();
 			}
 		}
 	}

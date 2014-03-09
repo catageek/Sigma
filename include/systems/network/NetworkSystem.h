@@ -4,6 +4,7 @@
 #include "Sigma.h"
 #include "systems/network/IOWorker.h"
 #include "systems/network/IOPoller.h"
+#include "systems/network/AtomicQueue.hpp"
 
 namespace network {
 	class TCPConnection;
@@ -26,6 +27,10 @@ namespace Sigma {
          */
 		DLL_EXPORT bool Start(const char *ip, unsigned short port);
 
+		static AtomicQueue<int>* GetPendingQueue() { return &pending; };
+		static AtomicQueue<int>* GetAuthRequestQueue() { return &authentication_req; };
+		static AtomicQueue<int>* GetDataRecvQueue() { return &data_received; };
+
 	private:
         /** \brief The listener waits for connections and pass new connections to the IncomingConnection
          *
@@ -43,6 +48,10 @@ namespace Sigma {
 
 		IOPoller poller;
 		IOWorker worker;
+
+		static AtomicQueue<int> pending;			// Connections accepted, no data received
+		static AtomicQueue<int> authentication_req;	// Data received, not authenticated
+		static AtomicQueue<int> data_received;		// Data received, authenticated
 	};
 }
 

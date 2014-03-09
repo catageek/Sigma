@@ -12,6 +12,9 @@ using namespace network;
 namespace Sigma {
 	NetworkSystem::NetworkSystem() : poller(), worker(IOWorker(poller)) {};
 
+	AtomicQueue<int> NetworkSystem::pending;
+	AtomicQueue<int> NetworkSystem::authentication_req;	// Data received, not authenticated
+	AtomicQueue<int> NetworkSystem::data_received;		// Data received, authenticated
 
 	bool NetworkSystem::Start(const char *ip, unsigned short port) {
 		if (! poller.Initialize()) {
@@ -101,6 +104,4 @@ namespace Sigma {
 		if (kevent(kq, &evSet, 1, NULL, 0, NULL) == -1)
 			LOG_ERROR << "kevent error";
 	}
-
-
 }
