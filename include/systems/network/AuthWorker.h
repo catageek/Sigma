@@ -17,14 +17,14 @@ namespace Sigma {
 			// TODO: find login and retrieve password
 			std::string expected = "good_password";
 			// TODO: compare submitted pasword to the one we have
-			return expected == packet->data.password;
+			return expected == packet->data.passhash;
 		}
 
 		void Work() {
 			auto req_list = NetworkSystem::GetAuthRequestQueue()->Poll();
 			for (auto req : *req_list) {
 				AuthenticationPacket packet;
-				auto len = TCPConnection(req, NETA_IPv4, SCS_CONNECTED).Recv(packet.buffer, 32);
+				auto len = TCPConnection(req, NETA_IPv4, SCS_CONNECTED).Recv(packet.buffer, sizeof(packet));
 				LOG_DEBUG << "received " << len << " bytes";
 				if (! Authenticate(&packet)) {
 					// close coonection
