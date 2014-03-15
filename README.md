@@ -27,6 +27,7 @@ Sigma requires the following dependencies:
 * An OpenAL API implementation;
 * [libogg](https://www.xiph.org/ogg/);
 * [libvorbis](https://www.xiph.org/ogg/);
+* [Crypto++](http://www.cryptopp.com/);
 
 Sigma on Linux also requires [GTK+ 2](http://www.gtk.org), due to usage of Chromium Embedded Framework.
 When building these libraries from source, always build them as shared objects (`.so`). In cmake-builds, this can be done using `cmake -DBUILD_SHARED_LIBS=ON`.
