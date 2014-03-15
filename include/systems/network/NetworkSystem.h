@@ -5,6 +5,7 @@
 #include "systems/network/IOPoller.h"
 #include "systems/network/AtomicQueue.hpp"
 #include "systems/network/AtomicSet.hpp"
+#include "systems/network/Crypto.h"
 #include "systems/network/ThreadPool.h"
 #include "systems/network/Protocol.h"
 
@@ -37,6 +38,7 @@ namespace Sigma {
          */
 		DLL_EXPORT bool Start(const char *ip, unsigned short port);
 
+		static Crypto* GetCryptoEngine() { return &crypto; };
 		static ThreadPool* GetThreadPool() { return &thread_pool; };
 
 		static AtomicSet<int>* GetPendingSet() { return &pending; };
@@ -65,6 +67,7 @@ namespace Sigma {
 		chain_t unauthenticated_reassemble;
 		chain_t request_authentication;
 
+		static Crypto crypto;
 		static ThreadPool thread_pool;
 		static AtomicSet<int> pending;				// Connections accepted, no data received
 		static AtomicQueue<std::shared_ptr<ChallengePrepareTaskRequest>> chall_req;				// Challenge request

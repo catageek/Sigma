@@ -20,6 +20,7 @@ using namespace network;
 namespace Sigma {
 	NetworkSystem::NetworkSystem() : poller() {};
 
+	Crypto NetworkSystem::crypto(true);
 	ThreadPool NetworkSystem::thread_pool{5};
 	AtomicSet<int> NetworkSystem::pending;
 	AtomicQueue<std::shared_ptr<ChallengePrepareTaskRequest>> NetworkSystem::chall_req;

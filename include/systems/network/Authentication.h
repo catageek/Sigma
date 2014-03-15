@@ -20,7 +20,7 @@ namespace Sigma {
 
 		std::shared_ptr<AuthChallReqPacket> GetChallenge() {
 			// TODO
-			return std::make_shared<AuthChallReqPacket>(0, 0);
+			return std::make_shared<AuthChallReqPacket>(NetworkSystem::GetCryptoEngine()->GetNonce(), 0);
 		}
 
 	private:
