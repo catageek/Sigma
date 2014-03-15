@@ -6,7 +6,7 @@
 #include "netport/include/net/network.h"
 #include "systems/network/Protocol.h"
 #include "systems/network/ThreadPool.h"
-#include "systems/network/AuthenticationPacket.h"
+#include "systems/network/Authentication.h"
 // Hom many seconds to wait the first bytes
 #define WAIT_DATA 3
 
@@ -20,11 +20,9 @@ using namespace network;
 namespace Sigma {
 	NetworkSystem::NetworkSystem() : poller() {};
 
-	AtomicQueue<block_t*> NetworkSystem::next_chain;
-
 	ThreadPool NetworkSystem::thread_pool{5};
 	AtomicSet<int> NetworkSystem::pending;
-	AtomicQueue<int> NetworkSystem::public_req;
+	AtomicQueue<std::shared_ptr<ChallengePrepareTaskRequest>> NetworkSystem::chall_req;
 	AtomicQueue<int> NetworkSystem::authentication_req;	// Data received, not authenticated
 	AtomicQueue<int> NetworkSystem::data_received;		// Data received, authenticated
 	AtomicQueue<std::shared_ptr<Frame_req>> NetworkSystem::pub_rawframe_req;	// Request a full frame
@@ -73,13 +71,6 @@ namespace Sigma {
 			return std::unique_ptr<TCPConnection>();
 		}
 		return std::move(server);
-	}
-
-	bool NetworkSystem::Authenticate(const AuthenticationPacket* packet) {
-		// TODO: find login and retrieve password
-		std::string expected = "good_password";
-		// TODO: compare submitted pasword to the one we have
-		return expected == packet->data.passhash;
 	}
 
 	void NetworkSystem::CloseConnection(int fd) {
@@ -149,7 +140,7 @@ namespace Sigma {
 			// Reassemble the frames
 			[&](){
 				auto req_list = NetworkSystem::GetPublicRawFrameReqQueue()->Poll();
-				LOG_DEBUG << "got " << req_list->size() << " RawFrameReq events";
+				LOG_DEBUG << "got " << req_list->size() << " PublicRawFrameReq events";
 				for (auto& req : *req_list) {
 					auto current_size = req->reassembled_frame->length.value;
 					auto target_size = req->length_requested;
@@ -176,8 +167,8 @@ namespace Sigma {
 			// Read the header
 			[&](){
 				auto req_list = NetworkSystem::GetPublicReassembledFrameQueue()->Poll();
-				LOG_DEBUG << "got " << req_list->size() << " PublicReq events";
-				for (auto req : *req_list) {
+				LOG_DEBUG << "got " << req_list->size() << " PublicReassembleReq events";
+				for (auto& req : *req_list) {
 					msg_hdr* header = reinterpret_cast<msg_hdr*>(req->data->data());
 					auto major = header->data.type_major;
 					if (IS_RESTRICTED(major)) {
@@ -189,6 +180,7 @@ namespace Sigma {
 					case NET_MSG:
 						if (header->data.type_minor == AUTH_REQUEST) {
 							NetworkSystem::GetAuthRequestQueue()->Push(req->fd);
+							GetThreadPool()->Queue(new TaskReq(request_authentication, 0));
 						}
 						break;
 					default:
@@ -197,22 +189,47 @@ namespace Sigma {
 				}
 				return NEXT;
 			},
-			// Get authentication packet and validate
+		});
+
+		request_authentication = chain_t({
+			// Get authentication initial packet
 			[&](){
 				auto req_list = NetworkSystem::GetAuthRequestQueue()->Poll();
 				LOG_DEBUG << "got " << req_list->size() << " AuthReq events";
-				for (auto req : *req_list) {
-					AuthenticationPacket packet;
-					auto len = TCPConnection(req, NETA_IPv4, SCS_CONNECTED).Recv(packet.buffer, sizeof(packet));
+				for (auto& req : *req_list) {
+					auto packet = std::make_shared<AuthInitPacket>();
+					auto len = TCPConnection(req, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(packet.get()), sizeof(*packet));
 					LOG_DEBUG << "received " << len << " bytes";
-					if (! Authenticate(&packet)) {
-						// close coonection
-						LOG_DEBUG << "Authentication failed";
-						CloseConnection(req);
+					auto task_request = std::make_shared<ChallengePrepareTaskRequest>(req, std::move(packet));
+					NetworkSystem::GetChallengeRequestQueue()->Push(std::move(task_request));
+				}
+				return NEXT;
+			},
+			// Send challenge
+			[&](){
+				while(1) {
+					auto req_list = NetworkSystem::GetChallengeRequestQueue()->Poll();
+					LOG_DEBUG << "got " << req_list->size() << " ChallReq events";
+					if (req_list->empty()) {
+						break;
 					}
-					LOG_DEBUG << "Authentication OK";
-					poller.Watch(req);
-					NetworkSystem::GetPendingSet()->Erase(req);
+					for (auto& req : *req_list) {
+						auto challenge = req->packet->GetChallenge();
+						if (challenge) {
+							// send challenge
+							TCPConnection(req->fd, NETA_IPv4, SCS_CONNECTED).Send(reinterpret_cast<char*>(challenge.get()), sizeof(AuthChallReqPacket));
+							LOG_DEBUG << "Send challenge.";
+							// Wait reply
+							poller.Watch(req->fd);
+						}
+						else {
+							// close connection
+							// TODO: send error message
+							//TCPConnection(req->fd, NETA_IPv4, SCS_CONNECTED).Send(reinterpret_cast<char*>(challenge.get()), sizeof(*challenge));
+							LOG_DEBUG << "User unknown: " << req->packet->login;
+							CloseConnection(req->fd);
+						}
+					}
 				}
 				return STOP;
 			}

@@ -14,7 +14,7 @@ namespace network {
 
 namespace Sigma {
 	class IOPoller;
-	class AuthenticationPacket;
+	class ChallengePrepareTaskRequest;
 
 	struct Frame_req {
 		Frame_req(int fd, uint32_t length) : reassembled_frame(std::make_shared<Frame>(fd)), length_requested(length) {};
@@ -37,12 +37,10 @@ namespace Sigma {
          */
 		DLL_EXPORT bool Start(const char *ip, unsigned short port);
 
-		static AtomicQueue<block_t*>* GetNextTargetChain() { return &next_chain; };
-
 		static ThreadPool* GetThreadPool() { return &thread_pool; };
 
 		static AtomicSet<int>* GetPendingSet() { return &pending; };
-		static AtomicQueue<int>* GetPublicReqQueue() { return &public_req; };
+		static AtomicQueue<std::shared_ptr<ChallengePrepareTaskRequest>>* GetChallengeRequestQueue() { return &chall_req; };
 		static AtomicQueue<int>* GetAuthRequestQueue() { return &authentication_req; };
 		static AtomicQueue<int>* GetDataRecvQueue() { return &data_received; };
 		static AtomicQueue<std::shared_ptr<Frame_req>>* GetPublicRawFrameReqQueue() { return &pub_rawframe_req; };
@@ -58,7 +56,6 @@ namespace Sigma {
 
 		void SetPipeline();
 
-		bool Authenticate(const AuthenticationPacket* packet);
 		void CloseConnection(int fd);
 
 		int ssocket;											// the listening socket
@@ -66,12 +63,11 @@ namespace Sigma {
 
 		chain_t start;
 		chain_t unauthenticated_reassemble;
-
-		static AtomicQueue<block_t*> next_chain;
+		chain_t request_authentication;
 
 		static ThreadPool thread_pool;
 		static AtomicSet<int> pending;				// Connections accepted, no data received
-		static AtomicQueue<int> public_req;				// Data received, not authenticated
+		static AtomicQueue<std::shared_ptr<ChallengePrepareTaskRequest>> chall_req;				// Challenge request
 		static AtomicQueue<int> authentication_req;		// Authentication request
 		static AtomicQueue<int> data_received;			// Data received, authenticated
 		static AtomicQueue<std::shared_ptr<Frame_req>> pub_rawframe_req;		// raw frame requests
