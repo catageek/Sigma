@@ -4,19 +4,35 @@
 #include <chrono>
 #include <sys/event.h>
 #include "netport/include/net/network.h"
+#include "systems/network/Protocol.h"
+#include "systems/network/ThreadPool.h"
+#include "systems/network/AuthenticationPacket.h"
 // Hom many seconds to wait the first bytes
 #define WAIT_DATA 3
+
+#define OPEN_CHAIN chaint_t({
+#define OPEN_LAMBDA [&]() -> int (
+#define CLOSE_LAMBDA )
+#define CLOSE_CHAIN })
 
 using namespace network;
 
 namespace Sigma {
-	NetworkSystem::NetworkSystem() : poller(), worker(IOWorker(poller)) {};
+	NetworkSystem::NetworkSystem() : poller() {};
 
-	AtomicQueue<int> NetworkSystem::pending;
+	AtomicQueue<block_t*> NetworkSystem::next_chain;
+
+	ThreadPool NetworkSystem::thread_pool{5};
+	AtomicSet<int> NetworkSystem::pending;
+	AtomicQueue<int> NetworkSystem::public_req;
 	AtomicQueue<int> NetworkSystem::authentication_req;	// Data received, not authenticated
 	AtomicQueue<int> NetworkSystem::data_received;		// Data received, authenticated
+	AtomicQueue<std::shared_ptr<Frame_req>> NetworkSystem::pub_rawframe_req;	// Request a full frame
+	AtomicQueue<std::shared_ptr<Frame>> NetworkSystem::pub_frame_req;		// Reassemble the frame
 
 	bool NetworkSystem::Start(const char *ip, unsigned short port) {
+		SetPipeline();
+
 		if (! poller.Initialize()) {
 			LOG_ERROR << "Could not initialize kqueue !";
 			return false;
@@ -28,8 +44,12 @@ namespace Sigma {
 			return false;
 		}
 		// run the IOWorker thread
-		std::thread t(&IOWorker::watch_start, &this->worker, std::move(s));
-		t.detach();
+		//std::thread t(&IOWorker::watch_start, &this->worker, std::move(s));
+		//t.detach();
+		ssocket = s->Handle();
+		poller.Watch(ssocket);
+		auto tr = new TaskReq(start, 0);
+		GetThreadPool()->Queue(tr);
 		return true;
 	}
 
@@ -55,53 +75,147 @@ namespace Sigma {
 		return std::move(server);
 	}
 
-	void NetworkSystem::ConnectionHandler(TCPConnection client) {
-		client.SetNonBlocking(true);
-		LOG_DEBUG << "Handling connection from " << client.GetRemote().ToString();
-		std::string s, auth_data;
-		int i;
-		char len = 0;
-		// We get a byte giving the length of the string to wait, in a limited time
-		for (auto d = 0; d < WAIT_DATA; ++d, std::this_thread::sleep_for(std::chrono::seconds(1))) {
-			i = client.Recv(s, 10);
-			if (i == 0) { continue; }
-			if (i > 0) {
-				// we got data
-				for (auto it = s.cbegin(); it != s.cend(); ++it) {
-					if (len == 0) {
-						len = *it;
-						if (len <= 0 || len > 32) {
-							// we drop the connection
-							client.Close();
-							return;
-						}
+	bool NetworkSystem::Authenticate(const AuthenticationPacket* packet) {
+		// TODO: find login and retrieve password
+		std::string expected = "good_password";
+		// TODO: compare submitted pasword to the one we have
+		return expected == packet->data.passhash;
+	}
+
+	void NetworkSystem::CloseConnection(int fd) {
+		poller.Unwatch(fd);
+		TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Close();
+		NetworkSystem::GetPendingSet()->Erase(fd);
+	}
+
+	void NetworkSystem::SetPipeline() {
+		start = chain_t({
+			// Poll the socket and select the next chain to run
+			[&](){
+				std::vector<struct kevent> evList(32);
+				auto nev = poller.Poll(evList, nullptr);
+				if (nev < 1) {
+					LOG_ERROR << "Error when polling event";
+				}
+				LOG_DEBUG << "got " << nev << " kqueue events";
+				for (auto i=0; i<nev; i++) {
+					auto fd = evList[i].ident;
+					if (evList[i].flags & EV_EOF) {
+						LOG_DEBUG << "disconnect " << fd;
+						CloseConnection(fd);
 						continue;
 					}
-					auth_data += *it;
+					if (evList[i].flags & EV_ERROR) {   /* report any error */
+						LOG_ERROR << "EV_ERROR: " << evList[i].data;
+						continue;
+					}
+
+					if (fd == ssocket) {
+						TCPConnection c;
+						if (! TCPConnection(ssocket, NETA_IPv4, SCS_LISTEN).Accept(&c)) {
+							LOG_ERROR << "Could not accept connection, handle is " << ssocket;
+							continue;
+						}
+						poller.Watch(c.Handle());
+						LOG_DEBUG << "connect " << c.Handle();
+						c.Send("welcome!\n");
+						NetworkSystem::GetPendingSet()->Insert(c.Handle());
+					}
+					else if (evList[i].flags & EVFILT_READ) {
+						// Data received
+						if (NetworkSystem::GetPendingSet()->Count(fd)) {
+							// Data received, not authenticated
+							// Build a fram request
+							auto fr = std::make_shared<Frame_req>(fd, sizeof(msg_hdr));
+							// We stop watching the connection until we got all the frame
+							poller.Unwatch(fd);
+							// queue the task to reassemble the header
+							NetworkSystem::GetPublicRawFrameReqQueue()->Push(fr);
+							GetThreadPool()->Queue(new TaskReq(unauthenticated_reassemble, 0));
+						}
+						else {
+							// Data received from authenticated client
+							NetworkSystem::GetDataRecvQueue()->Push(fd);
+						}
+					}
 				}
-				if (auth_data.size() == len) {
-					break;
-				}
+				// Queue a task to wait another event
+				GetThreadPool()->Queue(new TaskReq(start, 0));
+				return STOP;
 			}
-		}
-		if (len == 0 || auth_data.size() != len) {
-			// We drop the connection after the timeout
-			client.Close();
-			return;
-		}
-		LOG_DEBUG << "Got data : " << auth_data;
-		// TODO: authenticate user
-		// TODO: get a dynamic ID
-		// hardcoded ID for the moment
-		id_t id = 1;
+		});
 
-		int kq;
-		struct kevent evSet;
-
-		kq = kqueue();
-
-		EV_SET(&evSet, client.Handle(), EVFILT_READ, EV_ADD, 0, 0, NULL);
-		if (kevent(kq, &evSet, 1, NULL, 0, NULL) == -1)
-			LOG_ERROR << "kevent error";
+		unauthenticated_reassemble = chain_t({
+			// Reassemble the frames
+			[&](){
+				auto req_list = NetworkSystem::GetPublicRawFrameReqQueue()->Poll();
+				LOG_DEBUG << "got " << req_list->size() << " RawFrameReq events";
+				for (auto& req : *req_list) {
+					auto current_size = req->reassembled_frame->length.value;
+					auto target_size = req->length_requested;
+					auto buffer = req->reassembled_frame->data;
+					if (! buffer) {
+						req->reassembled_frame->data = std::make_shared<std::vector<char>>(target_size);
+						buffer = req->reassembled_frame->data;
+					}
+					auto len = TCPConnection(req->reassembled_frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(buffer->data() + current_size, target_size - current_size);
+					LOG_DEBUG << "got " << len << " bytes in reassemble_frame for fd = " << req->reassembled_frame->fd << ", target = " << target_size << " current = " << current_size;
+					current_size += len;
+					if (current_size < target_size) {
+						// we put again the request in the queue
+						req->reassembled_frame->length.value = current_size;
+						NetworkSystem::GetPublicRawFrameReqQueue()->Push(req);
+						GetThreadPool()->Queue(new TaskReq(unauthenticated_reassemble, 0));
+					}
+					else {
+						NetworkSystem::GetPublicReassembledFrameQueue()->Push(req->reassembled_frame);
+					}
+				}
+				return NEXT;
+			},
+			// Read the header
+			[&](){
+				auto req_list = NetworkSystem::GetPublicReassembledFrameQueue()->Poll();
+				LOG_DEBUG << "got " << req_list->size() << " PublicReq events";
+				for (auto req : *req_list) {
+					msg_hdr* header = reinterpret_cast<msg_hdr*>(req->data->data());
+					auto major = header->data.type_major;
+					if (IS_RESTRICTED(major)) {
+						LOG_DEBUG << "restricted";
+						CloseConnection(req->fd);
+						break;
+					}
+					switch(major) {
+					case NET_MSG:
+						if (header->data.type_minor == AUTH_REQUEST) {
+							NetworkSystem::GetAuthRequestQueue()->Push(req->fd);
+						}
+						break;
+					default:
+						CloseConnection(req->fd);
+					}
+				}
+				return NEXT;
+			},
+			// Get authentication packet and validate
+			[&](){
+				auto req_list = NetworkSystem::GetAuthRequestQueue()->Poll();
+				LOG_DEBUG << "got " << req_list->size() << " AuthReq events";
+				for (auto req : *req_list) {
+					AuthenticationPacket packet;
+					auto len = TCPConnection(req, NETA_IPv4, SCS_CONNECTED).Recv(packet.buffer, sizeof(packet));
+					LOG_DEBUG << "received " << len << " bytes";
+					if (! Authenticate(&packet)) {
+						// close coonection
+						LOG_DEBUG << "Authentication failed";
+						CloseConnection(req);
+					}
+					LOG_DEBUG << "Authentication OK";
+					poller.Watch(req);
+					NetworkSystem::GetPendingSet()->Erase(req);
+				}
+				return STOP;
+			}
+		});
 	}
 }

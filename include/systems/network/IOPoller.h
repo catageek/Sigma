@@ -55,10 +55,6 @@ namespace Sigma {
 	inline void IOPoller::Unwatch(int fd) {
 		IOEvent e(fd, EVFILT_READ, EV_DELETE);
 		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
-		if (i == -1) {
-			perror ("The following error occurred in Unwatch(): ");
-			return;
-		}
 		LOG_DEBUG << "unwatching " << fd;
 	}
 

@@ -23,19 +23,14 @@ namespace Sigma {
 			return ret;
 		}
 
-		void Add(T element) {
+		void Push(T element) {
 			mtx.lock();
 			q->push_back(element);
 			mtx.unlock();
 		}
 
-		bool Exist(const T& element) const {
-			for (auto e = q->cbegin(), qend = q->cend(); e != qend; e++) {
-				if (*e == element) {
-					return true;
-				}
-			}
-			return false;
+		bool Empty() const {
+			return q->empty();
 		}
 
 	private:
