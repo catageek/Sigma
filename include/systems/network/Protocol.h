@@ -27,29 +27,19 @@
 #define IS_RESTRICTED(x)	((x >> 3) != 0)
 
 namespace Sigma {
-	struct msg_hdr_data {
+	struct msg_hdr {
 		uint32_t length;
 		uint32_t flags;
-		char type_major;
-		char type_minor;
+		unsigned char type_major;
+		unsigned char type_minor;
 		char padding[2];
 	};
 
-	union msg_hdr {
-		msg_hdr_data data;
-		char buffer[sizeof(msg_hdr_data)];
-	};
-
 	struct Message {
+		Message(std::shared_ptr<msg_hdr>& header, std::shared_ptr<std::vector<char>>& body) : header(header), body(body) {};
+		Message(std::shared_ptr<msg_hdr>&& header, std::shared_ptr<std::vector<char>>&& body) : header(std::move(header)), body(std::move(body)) {};
 		std::shared_ptr<msg_hdr> header;
 		std::shared_ptr<std::vector<char>> body;
-	};
-
-	union Frame_hdr {
-		Frame_hdr(uint32_t l) : value(l) {};
-
-		uint32_t value;
-		char buffer[4];
 	};
 
 	struct Frame {
@@ -57,7 +47,7 @@ namespace Sigma {
 
 		int fd;
 		std::shared_ptr<std::vector<char>> data;
-		Frame_hdr length;
+		uint32_t length;
 	};
 }
 

@@ -18,16 +18,7 @@
 using namespace network;
 
 namespace Sigma {
-	NetworkSystem::NetworkSystem() : poller() {};
-
-	Crypto NetworkSystem::crypto(true);
-	ThreadPool NetworkSystem::thread_pool{5};
-	AtomicSet<int> NetworkSystem::pending;
-	AtomicQueue<std::shared_ptr<ChallengePrepareTaskRequest>> NetworkSystem::chall_req;
-	AtomicQueue<int> NetworkSystem::authentication_req;	// Data received, not authenticated
-	AtomicQueue<int> NetworkSystem::data_received;		// Data received, authenticated
-	AtomicQueue<std::shared_ptr<Frame_req>> NetworkSystem::pub_rawframe_req;	// Request a full frame
-	AtomicQueue<std::shared_ptr<Frame>> NetworkSystem::pub_frame_req;		// Reassemble the frame
+	NetworkSystem::NetworkSystem() : poller(), thread_pool(5) {};
 
 	bool NetworkSystem::Start(const char *ip, unsigned short port) {
 		SetPipeline();
@@ -110,7 +101,7 @@ namespace Sigma {
 						}
 						poller.Watch(c.Handle());
 						LOG_DEBUG << "connect " << c.Handle();
-						c.Send("welcome!\n");
+//						c.Send("welcome!\n");
 						NetworkSystem::GetPendingSet()->Insert(c.Handle());
 					}
 					else if (evList[i].flags & EVFILT_READ) {
@@ -143,7 +134,7 @@ namespace Sigma {
 				auto req_list = NetworkSystem::GetPublicRawFrameReqQueue()->Poll();
 				LOG_DEBUG << "got " << req_list->size() << " PublicRawFrameReq events";
 				for (auto& req : *req_list) {
-					auto current_size = req->reassembled_frame->length.value;
+					auto current_size = req->reassembled_frame->length;
 					auto target_size = req->length_requested;
 					auto buffer = req->reassembled_frame->data;
 					if (! buffer) {
@@ -155,7 +146,7 @@ namespace Sigma {
 					current_size += len;
 					if (current_size < target_size) {
 						// we put again the request in the queue
-						req->reassembled_frame->length.value = current_size;
+						req->reassembled_frame->length = current_size;
 						NetworkSystem::GetPublicRawFrameReqQueue()->Push(req);
 						GetThreadPool()->Queue(new TaskReq(unauthenticated_reassemble, 0));
 					}
@@ -171,7 +162,7 @@ namespace Sigma {
 				LOG_DEBUG << "got " << req_list->size() << " PublicReassembleReq events";
 				for (auto& req : *req_list) {
 					msg_hdr* header = reinterpret_cast<msg_hdr*>(req->data->data());
-					auto major = header->data.type_major;
+					auto major = header->type_major;
 					if (IS_RESTRICTED(major)) {
 						LOG_DEBUG << "restricted";
 						CloseConnection(req->fd);
@@ -179,7 +170,7 @@ namespace Sigma {
 					}
 					switch(major) {
 					case NET_MSG:
-						if (header->data.type_minor == AUTH_REQUEST) {
+						if (header->type_minor == AUTH_REQUEST) {
 							NetworkSystem::GetAuthRequestQueue()->Push(req->fd);
 							GetThreadPool()->Queue(new TaskReq(request_authentication, 0));
 						}
@@ -217,7 +208,12 @@ namespace Sigma {
 					for (auto& req : *req_list) {
 						auto challenge = req->packet->GetChallenge();
 						if (challenge) {
+							msg_hdr header;
+							header.length = sizeof(AuthChallReqPacket);
+							header.type_major = 1;
+							header.type_minor = 2;
 							// send challenge
+							TCPConnection(req->fd, NETA_IPv4, SCS_CONNECTED).Send(reinterpret_cast<char*>(&header), sizeof(msg_hdr));
 							TCPConnection(req->fd, NETA_IPv4, SCS_CONNECTED).Send(reinterpret_cast<char*>(challenge.get()), sizeof(AuthChallReqPacket));
 							LOG_DEBUG << "Send challenge.";
 							// Wait reply

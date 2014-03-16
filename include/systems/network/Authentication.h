@@ -4,14 +4,23 @@
 #include <cstdint>
 #include "systems/network/AtomicMap.hpp"
 #include "systems/network/NetworkSystem.h"
+#include "systems/network/Crypto.h"
 
 #define LOGIN_FIELD_SIZE	16
 
 #define AUTH_REQUEST	1
-#define USER_UNKNOWN	2
+#define CHALLENGE		2
+#define USER_UNKNOWN	16
 
 namespace Sigma {
 	struct ChallengePrepareTaskRequest;
+
+	class Authentication {
+	public:
+		static Crypto* GetCryptoEngine() { return &crypto; };
+	private:
+		static Crypto crypto;
+	};
 
 	struct AuthChallReqPacket {
 		AuthChallReqPacket(uint64_t nonce, uint16_t salt) : nonce(nonce), salt(salt) {};
@@ -25,7 +34,7 @@ namespace Sigma {
 
 		std::shared_ptr<AuthChallReqPacket> GetChallenge() {
 			// TODO
-			return std::make_shared<AuthChallReqPacket>(NetworkSystem::GetCryptoEngine()->GetNonce(), 0);
+			return std::make_shared<AuthChallReqPacket>(Authentication::GetCryptoEngine()->GetNonce(), 0);
 		}
 
 	private:

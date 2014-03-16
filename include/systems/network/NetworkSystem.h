@@ -5,7 +5,6 @@
 #include "systems/network/IOPoller.h"
 #include "systems/network/AtomicQueue.hpp"
 #include "systems/network/AtomicSet.hpp"
-#include "systems/network/Crypto.h"
 #include "systems/network/ThreadPool.h"
 #include "systems/network/Protocol.h"
 
@@ -38,15 +37,14 @@ namespace Sigma {
          */
 		DLL_EXPORT bool Start(const char *ip, unsigned short port);
 
-		static Crypto* GetCryptoEngine() { return &crypto; };
-		static ThreadPool* GetThreadPool() { return &thread_pool; };
+		ThreadPool* GetThreadPool() { return &thread_pool; };
 
-		static AtomicSet<int>* GetPendingSet() { return &pending; };
-		static AtomicQueue<std::shared_ptr<ChallengePrepareTaskRequest>>* GetChallengeRequestQueue() { return &chall_req; };
-		static AtomicQueue<int>* GetAuthRequestQueue() { return &authentication_req; };
-		static AtomicQueue<int>* GetDataRecvQueue() { return &data_received; };
-		static AtomicQueue<std::shared_ptr<Frame_req>>* GetPublicRawFrameReqQueue() { return &pub_rawframe_req; };
-		static AtomicQueue<std::shared_ptr<Frame>>* GetPublicReassembledFrameQueue() { return &pub_frame_req; };
+		AtomicSet<int>* GetPendingSet() { return &pending; };
+		AtomicQueue<std::shared_ptr<ChallengePrepareTaskRequest>>* GetChallengeRequestQueue() { return &chall_req; };
+		AtomicQueue<int>* GetAuthRequestQueue() { return &authentication_req; };
+		AtomicQueue<int>* GetDataRecvQueue() { return &data_received; };
+		AtomicQueue<std::shared_ptr<Frame_req>>* GetPublicRawFrameReqQueue() { return &pub_rawframe_req; };
+		AtomicQueue<std::shared_ptr<Frame>>* GetPublicReassembledFrameQueue() { return &pub_frame_req; };
 
 	private:
         /** \brief The listener waits for connections and pass new connections to the IncomingConnection
@@ -67,14 +65,13 @@ namespace Sigma {
 		chain_t unauthenticated_reassemble;
 		chain_t request_authentication;
 
-		static Crypto crypto;
-		static ThreadPool thread_pool;
-		static AtomicSet<int> pending;				// Connections accepted, no data received
-		static AtomicQueue<std::shared_ptr<ChallengePrepareTaskRequest>> chall_req;				// Challenge request
-		static AtomicQueue<int> authentication_req;		// Authentication request
-		static AtomicQueue<int> data_received;			// Data received, authenticated
-		static AtomicQueue<std::shared_ptr<Frame_req>> pub_rawframe_req;		// raw frame requests
-		static AtomicQueue<std::shared_ptr<Frame>> pub_frame_req;			// reassembled frame request
+		ThreadPool thread_pool;
+		AtomicSet<int> pending;				// Connections accepted, no data received
+		AtomicQueue<std::shared_ptr<ChallengePrepareTaskRequest>> chall_req;				// Challenge request
+		AtomicQueue<int> authentication_req;		// Authentication request
+		AtomicQueue<int> data_received;			// Data received, authenticated
+		AtomicQueue<std::shared_ptr<Frame_req>> pub_rawframe_req;		// raw frame requests
+		AtomicQueue<std::shared_ptr<Frame>> pub_frame_req;			// reassembled frame request
 	};
 }
 
