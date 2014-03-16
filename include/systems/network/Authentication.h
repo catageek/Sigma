@@ -3,11 +3,16 @@
 
 #include <cstdint>
 #include "systems/network/AtomicMap.hpp"
+#include "systems/network/NetworkSystem.h"
+
+#define LOGIN_FIELD_SIZE	16
 
 #define AUTH_REQUEST	1
 #define USER_UNKNOWN	2
 
 namespace Sigma {
+	struct ChallengePrepareTaskRequest;
+
 	struct AuthChallReqPacket {
 		AuthChallReqPacket(uint64_t nonce, uint16_t salt) : nonce(nonce), salt(salt) {};
 		uint64_t nonce;		// a random number
@@ -16,7 +21,7 @@ namespace Sigma {
 	};
 
 	struct AuthInitPacket {;
-		char login[16];
+		char login[LOGIN_FIELD_SIZE];
 
 		std::shared_ptr<AuthChallReqPacket> GetChallenge() {
 			// TODO
