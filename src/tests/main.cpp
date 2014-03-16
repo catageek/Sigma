@@ -13,7 +13,7 @@
 #include "systems/WebGUISystem.h"
 #include "OS.h"
 #include "components/SpotLight.h"
-#include "systems/network/NetworkSystem.h"
+#include "systems/network/NetworkClient.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -46,7 +46,7 @@ int main(int argCount, char **argValues) {
 	Sigma::OpenALSystem alsys;
 	Sigma::BulletPhysics bphys;
 
-	Sigma::NetworkSystem netsys;
+	Sigma::NetworkClient netclient;
 
 	Sigma::FactorySystem& factory = Sigma::FactorySystem::getInstance();
 
@@ -104,7 +104,7 @@ int main(int argCount, char **argValues) {
 	// Start to listen network //
 	/////////////////////////////
 
-	netsys.Start("127.0.0.1", 7777);
+	netclient.Connect("127.0.0.1", 7777);
 
 	// Create hard coded entity ID #1
 	// position is hardcoded

@@ -1,8 +1,6 @@
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8)
 PROJECT (Sigma)
 
-set(CMAKE_CXX_FLAGS "-ggdb")
-
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
@@ -307,6 +305,10 @@ if(BUILD_EXE_Sigma)
 		if(TEST_NAME STREQUAL "main")
 			SET(TEST_NAME "Sigma")
 		endif(TEST_NAME STREQUAL "main")
+
+		if(TEST_NAME STREQUAL "Server_main")
+			SET(TEST_NAME "SigmaServer")
+		endif(TEST_NAME STREQUAL "Server_main")
 
 		MESSAGE(STATUS "Processing: ${TEST_NAME}")
 
