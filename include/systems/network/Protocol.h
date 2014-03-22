@@ -28,26 +28,57 @@
 
 namespace Sigma {
 	struct msg_hdr {
-		uint32_t length;
 		uint32_t flags;
 		unsigned char type_major;
 		unsigned char type_minor;
 		char padding[2];
 	};
 
-	struct Message {
-		Message(std::shared_ptr<msg_hdr>& header, std::shared_ptr<std::vector<char>>& body) : header(header), body(body) {};
-		Message(std::shared_ptr<msg_hdr>&& header, std::shared_ptr<std::vector<char>>&& body) : header(std::move(header)), body(std::move(body)) {};
+	struct Frame_hdr {
+		uint32_t length;
+	};
+
+	struct MessageObject {
+		MessageObject(std::shared_ptr<msg_hdr>& header, std::shared_ptr<std::vector<unsigned char>>& body) : header(header), body(body) {};
+		MessageObject(std::shared_ptr<msg_hdr>&& header, std::shared_ptr<std::vector<unsigned char>>&& body) : header(std::move(header)), body(std::move(body)) {};
 		std::shared_ptr<msg_hdr> header;
-		std::shared_ptr<std::vector<char>> body;
+		std::shared_ptr<std::vector<unsigned char>> body;
 	};
 
 	struct Frame {
-		Frame(int f) : fd(f), length(0) {};
+		Frame_hdr fheader;
+		msg_hdr mheader;
+	};
+
+	class FrameObject {
+	public:
+		FrameObject(int f) : fd(f), packet_size(0) {};
+
+		void CreateFrameSpace(uint32_t len) {
+			data.reset(new std::vector<char>(len));
+			packet_size = len;
+		};
+
+		void CreateMessageSpace(uint32_t len) {
+			data.reset(new std::vector<char>(len + sizeof(Frame_hdr)));
+			packet_size = len + sizeof(Frame_hdr);
+		};
+
+		void CreateBodySpace(uint32_t len) {
+			data.reset(new std::vector<char>(len + sizeof(Frame)));
+			packet_size = len + sizeof(Frame);
+		};
+
+		uint32_t PacketSize() { return packet_size; };
+
+		char* Body() { return ( data ? data->data() + sizeof(msg_hdr) + sizeof(Frame_hdr) : nullptr); };
+		msg_hdr* Header() { return reinterpret_cast<msg_hdr*>((data ? data->data() + sizeof(Frame_hdr) : nullptr)); };
+		Frame_hdr* Length() { return reinterpret_cast<Frame_hdr*>(data ? data->data() : nullptr); };
 
 		int fd;
+	private:
 		std::shared_ptr<std::vector<char>> data;
-		uint32_t length;
+		uint32_t packet_size;
 	};
 }
 

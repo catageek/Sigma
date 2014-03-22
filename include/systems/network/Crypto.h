@@ -2,7 +2,7 @@
 #define CRYPTO_H_INCLUDED
 
 #include "crypto++/osrng.h"
-#include "crypto++/cryptlib.h"
+#include "crypto++/dh.h"
 
 using namespace CryptoPP;
 
@@ -12,14 +12,22 @@ namespace Sigma {
 		Crypto(bool blocking = false) : _prng(blocking) {};
 		virtual ~Crypto() {};
 
-		uint64_t GetNonce() {
-			uint64_t ret;
-			_prng.GenerateBlock(reinterpret_cast<byte*>(&ret), 8);
-			return ret;
-		};
+		void InitializeDH();
+		void GetPublicKeys(char* buffer) const;
+		void VMAC(byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce);
+		bool VMAC_Verify(const byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce);
+
+		void GetRandom64(byte* nonce);
+		void GetRandom128(byte* nonce);
+
+		void SetSalt(std::unique_ptr<std::vector<byte>>&& salt) { _salt = std::move(salt); };
 
 	private:
+		DH _dh;
+		SecByteBlock _priv;
+		SecByteBlock _pub;
 		AutoSeededRandomPool _prng;
+		std::unique_ptr<std::vector<byte>> _salt;
 	};
 }
 

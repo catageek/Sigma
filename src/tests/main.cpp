@@ -104,6 +104,7 @@ int main(int argCount, char **argValues) {
 	// Start to listen network //
 	/////////////////////////////
 
+	netclient.Start();
 	netclient.Connect("127.0.0.1", 7777);
 
 	// Create hard coded entity ID #1

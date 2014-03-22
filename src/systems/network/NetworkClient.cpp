@@ -5,6 +5,10 @@
 #include "systems/network/Protocol.h"
 
 namespace Sigma {
+	void NetworkClient::Start() {
+		Authentication::GetCryptoEngine()->InitializeDH();
+	}
+
 	bool NetworkClient::Connect(const char *ip, unsigned short port) {
 		LOG_DEBUG << "Connecting...";
 		cnx = TCPConnection();
@@ -27,35 +31,39 @@ namespace Sigma {
 		char login[] = "my_login";
 		AuthInitPacket packet;
 		std::strncpy(packet.login, login, LOGIN_FIELD_SIZE - 1);
-		SendMessage(NET_MSG, AUTH_REQUEST, packet.login, 16);
+		SendMessage(NET_MSG, AUTH_INIT, reinterpret_cast<char*>(&packet), sizeof(AuthInitPacket));
 		return true;
 	}
 
-	void NetworkClient::SendMessage(unsigned char major, unsigned char minor, char* body, size_t len) {
-		msg_hdr header;
-		header.type_major = major;
-		header.type_minor = minor;
-		header.length = len;
-		cnx.Send(reinterpret_cast<char*>(&header), sizeof(msg_hdr));
-		cnx.Send(body, len);
+	inline void NetworkClient::SendMessage(unsigned char major, unsigned char minor, char* body, uint32_t len) {
+		NetworkSystem::SendMessage(cnx.Handle(), major, minor, body, len);
 	}
 
-	std::unique_ptr<Message> NetworkClient::RecvMessage() {
+	std::unique_ptr<MessageObject> NetworkClient::RecvMessage() {
+		uint32_t length;
+		// Get the length
+		auto len = cnx.Recv(reinterpret_cast<char*>(&length), sizeof(uint32_t));
+		if (len <= 0) {
+			return std::unique_ptr<MessageObject>();
+		}
+		if (len < sizeof(uint32_t) || length < sizeof(msg_hdr)) {
+			LOG_ERROR << "Connection error : received " << len << " bytes as length instead of " << sizeof(uint32_t);
+			return std::unique_ptr<MessageObject>();
+		}
+		length -= sizeof(msg_hdr);
 		auto header = std::make_shared<msg_hdr>();
-		// Get the header
-		auto len = cnx.Recv(reinterpret_cast<char*>(header.get()), sizeof(msg_hdr));
+		len = cnx.Recv(reinterpret_cast<char*>(header.get()), sizeof(msg_hdr));
 		if (len < sizeof(msg_hdr)) {
 			LOG_ERROR << "Connection error : received " << len << " bytes as header instead of " << sizeof(msg_hdr);
-			return std::unique_ptr<Message>();
+			return std::unique_ptr<MessageObject>();
 		}
-		auto body_size = header->length;
-		auto body = std::make_shared<std::vector<char>>(body_size);
-		len = cnx.Recv(body->data(), body_size);
-		if (len < body_size) {
-			LOG_ERROR << "Connection error : received " << len << " bytes as header instead of " << body_size;
-			return std::unique_ptr<Message>();
+		auto body = std::make_shared<std::vector<unsigned char>>(length);
+		len = cnx.Recv(reinterpret_cast<char*>(body->data()), length);
+		if (len < length) {
+			LOG_ERROR << "Connection error : received " << len << " bytes as body instead of " << length;
+			return std::unique_ptr<MessageObject>();
 		}
-		return std::unique_ptr<Message>(new Message(std::move(header), std::move(body)));
+		return std::unique_ptr<MessageObject>(new MessageObject(std::move(header), std::move(body)));
 	}
 
 	void NetworkClient::WaitMessage() {
@@ -64,9 +72,39 @@ namespace Sigma {
 			auto m = std::move(RecvMessage());
 			if(m) {
 				LOG_DEBUG << "Received message of " << m->body->size() << " bytes";
+				auto header = m->header;
+				auto major = header->type_major;
+				switch(major) {
+					case NET_MSG:
+					{
+						auto minor = header->type_minor;
+						switch(minor) {
+							case SEND_SALT:
+							{
+								// We must send DH keys
+								auto body = reinterpret_cast<SendSaltPacket*>(m->body->data());
+								LOG_DEBUG << "salt received : " << std::string(reinterpret_cast<const char*>(body->salt), 8);
+								Authentication::SetSalt(std::unique_ptr<std::vector<unsigned char>>(m->body.get()));
+								auto dhkeys = Authentication::GetDHKeysPacket();
+								SendMessage(NET_MSG, DH_EXCHANGE, reinterpret_cast<char*>(dhkeys.get()), sizeof(DHKeyExchangePacket));
+								LOG_DEBUG << "Sending DH keys : " << sizeof(DHKeyExchangePacket) << " bytes";
+								break;
+							}
+							case DH_EXCHANGE:
+								// We received DH Keys
+								auto body = reinterpret_cast<DHKeyExchangePacket*>(m->body.get());
+								if (Authentication::ComputeSharedSecretKey(*body))
+									LOG_DEBUG << "Secure key created";
+								break;
+						}
+					break;
+					}
+				}
 			}
 			else {
-				LOG_ERROR << "Received null pointer";
+				LOG_DEBUG << "Closing connection";
+				cnx.Close();
+				return;
 			}
 		}
 	}

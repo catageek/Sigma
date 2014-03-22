@@ -15,7 +15,7 @@ namespace Sigma {
 			std::cout << "running" << std::endl;
 		}
 		while(1) {
-			TaskReq* task;
+			std::shared_ptr<TaskQueueElement> task;
 			{
 				// Wait for a task to do
 				std::unique_lock<std::mutex> locker(m_queue);
@@ -50,13 +50,7 @@ namespace Sigma {
 				}
 			}
 
-			for(auto block = task->block, b_end = task->block_end; block != b_end; ++block) {
-				if((*block)()) {
-					break;
-				}
-			}
-
-			delete task;
+			task->RunTask();
 
 			{
 				std::unique_lock<std::mutex>(m_count);
@@ -71,15 +65,5 @@ namespace Sigma {
 		}
 	}
 
-	void ThreadPool::Queue(TaskReq* task) {
-		std::unique_lock<std::mutex> locker(m_queue);
-		for (auto t : taskqueue) {
-			if (t->block == task->block) {
-				// No duplicate entry
-				return;
-			}
-		}
-		taskqueue.push_back(task);
-		queuecheck.notify_one();
-	}
+
 }

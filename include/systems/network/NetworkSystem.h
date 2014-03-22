@@ -4,7 +4,7 @@
 #include "Sigma.h"
 #include "systems/network/IOPoller.h"
 #include "systems/network/AtomicQueue.hpp"
-#include "systems/network/AtomicSet.hpp"
+#include "systems/network/AtomicMap.hpp"
 #include "systems/network/ThreadPool.h"
 #include "systems/network/Protocol.h"
 
@@ -14,12 +14,14 @@ namespace network {
 
 namespace Sigma {
 	class IOPoller;
-	class ChallengePrepareTaskRequest;
+	class GetSaltTaskRequest;
 
 	struct Frame_req {
-		Frame_req(int fd, uint32_t length) : reassembled_frame(std::make_shared<Frame>(fd)), length_requested(length) {};
-		std::shared_ptr<Frame> reassembled_frame;
+		Frame_req(int fd) : reassembled_frame(std::make_shared<FrameObject>(fd)),
+			length_requested(sizeof(Frame_hdr)), length_got(0) {};
+		std::shared_ptr<FrameObject> reassembled_frame;
 		uint32_t length_requested;
+		uint32_t length_got;
 		void (*return_queue)(void);
 	};
 
@@ -39,12 +41,17 @@ namespace Sigma {
 
 		ThreadPool* GetThreadPool() { return &thread_pool; };
 
-		AtomicSet<int>* GetPendingSet() { return &pending; };
-		AtomicQueue<std::shared_ptr<ChallengePrepareTaskRequest>>* GetChallengeRequestQueue() { return &chall_req; };
-		AtomicQueue<int>* GetAuthRequestQueue() { return &authentication_req; };
+		static void SendMessage(int fd, unsigned char major, unsigned char minor, char* body, uint32_t len);
+		static void SendMessage(int fd, unsigned char major, unsigned char minor, const std::shared_ptr<FrameObject>& frame);
+
+		AtomicMap<int,char>* GetStatefulMap() { return &stateful; };
+		AtomicQueue<std::shared_ptr<FrameObject>>* GetSaltRequestQueue() { return &salt_req; };
+		AtomicQueue<std::shared_ptr<FrameObject>>* GetSaltRetrievedQueue() { return &salt_ret; };
+		AtomicQueue<std::shared_ptr<FrameObject>>* GetAuthRequestQueue() { return &authentication_req; };
+		AtomicQueue<std::shared_ptr<FrameObject>>* GetDHKeyExchangeQueue() { return &key_received; };
 		AtomicQueue<int>* GetDataRecvQueue() { return &data_received; };
 		AtomicQueue<std::shared_ptr<Frame_req>>* GetPublicRawFrameReqQueue() { return &pub_rawframe_req; };
-		AtomicQueue<std::shared_ptr<Frame>>* GetPublicReassembledFrameQueue() { return &pub_frame_req; };
+		AtomicQueue<std::shared_ptr<FrameObject>>* GetPublicReassembledFrameQueue() { return &pub_frame_req; };
 
 	private:
         /** \brief The listener waits for connections and pass new connections to the IncomingConnection
@@ -58,20 +65,28 @@ namespace Sigma {
 
 		void CloseConnection(int fd);
 
+		static int ReassembleFrame(AtomicQueue<std::shared_ptr<Frame_req>>* input, AtomicQueue<std::shared_ptr<FrameObject>>* output, ThreadPool* threadpool, const chain_t* rerun, size_t index);
+		int RetrieveSalt(std::shared_ptr<FrameObject> frame, AtomicQueue<std::shared_ptr<FrameObject>>* output);
+
+		void RequestPublicFrameAsync(int fd, size_t len);
+
 		int ssocket;											// the listening socket
 		IOPoller poller;
 
 		chain_t start;
-		chain_t unauthenticated_reassemble;
+		chain_t unauthenticated_recv_data;
 		chain_t request_authentication;
+		chain_t shared_secret_key;
 
 		ThreadPool thread_pool;
-		AtomicSet<int> pending;				// Connections accepted, no data received
-		AtomicQueue<std::shared_ptr<ChallengePrepareTaskRequest>> chall_req;				// Challenge request
-		AtomicQueue<int> authentication_req;		// Authentication request
+		AtomicMap<int,char> stateful;													// stateful connections, i.e packets are to be routed to a specific chain
+		AtomicQueue<std::shared_ptr<FrameObject>> salt_req;				// salt request
+		AtomicQueue<std::shared_ptr<FrameObject>> salt_ret;				// salt retrieved
+		AtomicQueue<std::shared_ptr<FrameObject>> authentication_req;			// Authentication request
+		AtomicQueue<std::shared_ptr<FrameObject>> key_received;											// Received DH key
 		AtomicQueue<int> data_received;			// Data received, authenticated
 		AtomicQueue<std::shared_ptr<Frame_req>> pub_rawframe_req;		// raw frame requests
-		AtomicQueue<std::shared_ptr<Frame>> pub_frame_req;			// reassembled frame request
+		AtomicQueue<std::shared_ptr<FrameObject>> pub_frame_req;			// reassembled frame request
 	};
 }
 

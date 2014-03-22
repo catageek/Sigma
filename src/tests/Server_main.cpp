@@ -1,5 +1,5 @@
 #include <iostream>
-
+#include <unistd.h>
 #include "systems/BulletPhysics.h"
 #include "systems/FactorySystem.h"
 #include "entities/BulletMover.h"
@@ -89,7 +89,7 @@ int main(int argCount, char **argValues) {
 	while (1) {
 		// Get time in ms, store it in seconds too
 		double deltaSec = glfwos.GetDeltaTime();
-
+		sleep(10000);
 
 		///////////////////////
 		// Update subsystems //

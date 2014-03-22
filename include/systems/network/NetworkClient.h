@@ -7,18 +7,20 @@
 using namespace network;
 
 namespace Sigma {
-	struct Message;
+	struct MessageObject;
 
 	class NetworkClient {
 	public:
 		NetworkClient() {};
 		virtual ~NetworkClient() {};
 
+		void Start();
+
 		bool Connect(const char *ip, unsigned short port);
 
-		void SendMessage(unsigned char major, unsigned char minor, char* body, size_t len);
+		void SendMessage(unsigned char major, unsigned char minor, char* body, uint32_t len);
 
-		std::unique_ptr<Message> RecvMessage();
+		std::unique_ptr<MessageObject> RecvMessage();
 
 		void WaitMessage();
 

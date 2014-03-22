@@ -39,6 +39,14 @@ namespace Sigma {
 			return false;
 		}
 
+		T& At(const K& key) const {
+			return q->at(key);
+		}
+
+		size_t Count(const K& key) const {
+			return q->count(key);
+		}
+
 	private:
 		atomic_map<K,T> q;
 		std::mutex mtx;
