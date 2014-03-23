@@ -33,7 +33,6 @@ namespace Sigma {
 	public:
 		static Crypto* GetCryptoEngine() { return &crypto; };
 		static void SetSalt(std::unique_ptr<std::vector<byte>>&& salt) { crypto.SetSalt(std::move(salt)); };
-		static std::shared_ptr<KeyExchangePacket> GetKeyExchangePacket();
 	private:
 		static Crypto crypto;
 	};
@@ -75,6 +74,7 @@ namespace Sigma {
 
 	struct SendSaltPacket {
 		byte salt[SALT_SIZE];								// the stored number used as salt for password
+		std::shared_ptr<FrameObject> GetKeyExchangePacket();
 	};
 
 	struct AuthInitPacket {

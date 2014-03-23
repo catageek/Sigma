@@ -6,15 +6,17 @@
 namespace Sigma {
 	Crypto Authentication::crypto(true);
 
-	std::shared_ptr<KeyExchangePacket> Authentication::GetKeyExchangePacket() {
-		auto packet = std::make_shared<KeyExchangePacket>();
+	std::shared_ptr<FrameObject> SendSaltPacket::GetKeyExchangePacket() {
+		auto frame = std::make_shared<FrameObject>();
+		auto packet = frame->Content<KeyExchangePacket>();
 		// TODO : hard coded key
 		byte key[] = "very_secret_key";
-		crypto.GetRandom64(packet->nonce);
-		crypto.GetRandom128(packet->nonce2);
-		crypto.GetRandom128(packet->alea);
-		crypto.VMAC64(packet->vmac, reinterpret_cast<const byte*>(packet.get()), VMAC_MSG_SIZE, key, packet->nonce);
-		return packet;
+		auto crypto = Authentication::GetCryptoEngine();
+		crypto->GetRandom64(packet->nonce);
+		crypto->GetRandom128(packet->nonce2);
+		crypto->GetRandom128(packet->alea);
+		crypto->VMAC64(packet->vmac, frame->Content<KeyExchangePacket,const byte>(), VMAC_MSG_SIZE, key, packet->nonce);
+		return frame;
 	}
 
 	bool KeyExchangePacket::VerifyVMAC() {

@@ -38,13 +38,6 @@ namespace Sigma {
 		uint32_t length;
 	};
 
-	struct MessageObject {
-		MessageObject(std::shared_ptr<msg_hdr>& header, std::shared_ptr<std::vector<unsigned char>>& body) : header(header), body(body) {};
-		MessageObject(std::shared_ptr<msg_hdr>&& header, std::shared_ptr<std::vector<unsigned char>>&& body) : header(std::move(header)), body(std::move(body)) {};
-		std::shared_ptr<msg_hdr> header;
-		std::shared_ptr<std::vector<unsigned char>> body;
-	};
-
 	struct Frame {
 		Frame_hdr fheader;
 		msg_hdr mheader;
@@ -52,37 +45,29 @@ namespace Sigma {
 
 	class FrameObject {
 	public:
-		FrameObject(int f) : fd(f), packet_size(0) {};
-		FrameObject() : fd(-1), packet_size(0) {};
+		FrameObject(int f) : fd(f), packet_size(sizeof(Frame_hdr)), data(std::make_shared<std::vector<char>>(sizeof(Frame_hdr))) {};
+		FrameObject() : fd(-1), packet_size(sizeof(Frame_hdr)), data(std::make_shared<std::vector<char>>(sizeof(Frame_hdr))) {};
 
-		template<class T>
-		T* Content() {
-			if(! data) {
-				CreateBodySpace(sizeof(T));
-			}
-			return reinterpret_cast<T*>(Body());
+		void SendMessage(int fd, unsigned char major, unsigned char minor) const;
+
+		void Resize(size_t new_size) {
+			packet_size = new_size + sizeof(Frame);
+			data->resize(packet_size);
 		}
 
-		void CreateFrameSpace(uint32_t len) {
-			data.reset(new std::vector<char>(len));
-			packet_size = len;
-		};
+		template<class T, class U=T>
+		U* Content() {
+			if(packet_size < sizeof(T) + sizeof(Frame)) {
+				Resize(sizeof(T));
+			}
+			return reinterpret_cast<U*>(Body());
+		}
 
-		void CreateMessageSpace(uint32_t len) {
-			data.reset(new std::vector<char>(len + sizeof(Frame_hdr)));
-			packet_size = len + sizeof(Frame_hdr);
-		};
+		uint32_t PacketSize() const { return packet_size; };
 
-		void CreateBodySpace(uint32_t len) {
-			data.reset(new std::vector<char>(len + sizeof(Frame)));
-			packet_size = len + sizeof(Frame);
-		};
-
-		uint32_t PacketSize() { return packet_size; };
-
-		char* Body() { return ( data ? data->data() + sizeof(msg_hdr) + sizeof(Frame_hdr) : nullptr); };
-		msg_hdr* Header() { return reinterpret_cast<msg_hdr*>((data ? data->data() + sizeof(Frame_hdr) : nullptr)); };
-		Frame_hdr* Length() { return reinterpret_cast<Frame_hdr*>(data ? data->data() : nullptr); };
+		char* Body() const { return ( data ? data->data() + sizeof(msg_hdr) + sizeof(Frame_hdr) : nullptr); };
+		msg_hdr* Header() const { return reinterpret_cast<msg_hdr*>((data ? data->data() + sizeof(Frame_hdr) : nullptr)); };
+		Frame_hdr* Length() const { return reinterpret_cast<Frame_hdr*>(data ? data->data() : nullptr); };
 
 		int fd;
 	private:

@@ -29,42 +29,37 @@ namespace Sigma {
 
 		// TODO
 		char login[] = "my_login";
-		AuthInitPacket packet;
-		std::strncpy(packet.login, login, LOGIN_FIELD_SIZE - 1);
-		SendMessage(NET_MSG, AUTH_INIT, reinterpret_cast<char*>(&packet), sizeof(AuthInitPacket));
+		auto packet = FrameObject();
+		std::strncpy(packet.Content<AuthInitPacket, char>(), login, LOGIN_FIELD_SIZE - 1);
+		SendMessage(NET_MSG, AUTH_INIT, packet);
 		auth_state = AUTH_INIT;
 		return true;
 	}
 
-	inline void NetworkClient::SendMessage(unsigned char major, unsigned char minor, char* body, uint32_t len) {
-		NetworkSystem::SendMessage(cnx.Handle(), major, minor, body, len);
+	inline void NetworkClient::SendMessage(unsigned char major, unsigned char minor, const FrameObject& packet) {
+		packet.SendMessage(cnx.Handle(), major, minor);
 	}
 
-	std::unique_ptr<MessageObject> NetworkClient::RecvMessage() {
-		uint32_t length;
+	std::unique_ptr<FrameObject> NetworkClient::RecvMessage() {
+		auto frame = std::unique_ptr<FrameObject>(new FrameObject());
 		// Get the length
-		auto len = cnx.Recv(reinterpret_cast<char*>(&length), sizeof(uint32_t));
+		auto len = cnx.Recv(reinterpret_cast<char*>(&frame->Length()->length), sizeof(uint32_t));
 		if (len <= 0) {
-			return std::unique_ptr<MessageObject>();
+			return std::unique_ptr<FrameObject>();
 		}
+		auto length = frame->Length()->length;
 		if (len < sizeof(uint32_t) || length < sizeof(msg_hdr)) {
 			LOG_ERROR << "Connection error : received " << len << " bytes as length instead of " << sizeof(uint32_t);
-			return std::unique_ptr<MessageObject>();
+			return std::unique_ptr<FrameObject>();
 		}
-		length -= sizeof(msg_hdr);
-		auto header = std::make_shared<msg_hdr>();
-		len = cnx.Recv(reinterpret_cast<char*>(header.get()), sizeof(msg_hdr));
-		if (len < sizeof(msg_hdr)) {
-			LOG_ERROR << "Connection error : received " << len << " bytes as header instead of " << sizeof(msg_hdr);
-			return std::unique_ptr<MessageObject>();
-		}
-		auto body = std::make_shared<std::vector<unsigned char>>(length);
-		len = cnx.Recv(reinterpret_cast<char*>(body->data()), length);
+		frame->Resize(length - sizeof(msg_hdr));
+		auto header = frame->Header();
+		len = cnx.Recv(reinterpret_cast<char*>(header), length);
 		if (len < length) {
-			LOG_ERROR << "Connection error : received " << len << " bytes as body instead of " << length;
-			return std::unique_ptr<MessageObject>();
+			LOG_ERROR << "Connection error : received " << len << " bytes as header instead of " << length;
+			return std::unique_ptr<FrameObject>();
 		}
-		return std::unique_ptr<MessageObject>(new MessageObject(std::move(header), std::move(body)));
+		return std::move(frame);
 	}
 
 	void NetworkClient::WaitMessage() {
@@ -72,8 +67,8 @@ namespace Sigma {
 			LOG_DEBUG << "Waiting message...";
 			auto m = std::move(RecvMessage());
 			if(m) {
-				LOG_DEBUG << "Received message of " << m->body->size() << " bytes";
-				auto header = m->header;
+				LOG_DEBUG << "Received message of " << m->PacketSize() << " bytes";
+				auto header = m->Header();
 				auto major = header->type_major;
 				switch(major) {
 					case NET_MSG:
@@ -82,20 +77,21 @@ namespace Sigma {
 						switch(minor) {
 							case AUTH_SEND_SALT:
 							{
-								// We must send DH keys
-								auto body = reinterpret_cast<SendSaltPacket*>(m->body->data());
+								// We must send keys
+								auto body = m->Content<SendSaltPacket>();
 								LOG_DEBUG << "salt received : " << std::string(reinterpret_cast<const char*>(body->salt), 8);
-								Authentication::SetSalt(std::unique_ptr<std::vector<unsigned char>>(m->body.get()));
-								auto dhkeys = Authentication::GetKeyExchangePacket();
-								dhkeys->VMAC_BuildHasher();
-								SendMessage(NET_MSG, AUTH_KEY_EXCHANGE, reinterpret_cast<char*>(dhkeys.get()), sizeof(KeyExchangePacket));
-								LOG_DEBUG << "Sending keys : " << sizeof(KeyExchangePacket) << " bytes";
+//								Authentication::SetSalt(std::unique_ptr<std::vector<unsigned char>>(m->body.get()));
+								auto frame = body->GetKeyExchangePacket();
+								auto packet = frame->Content<KeyExchangePacket>();
+								packet->VMAC_BuildHasher();
+								SendMessage(NET_MSG, AUTH_KEY_EXCHANGE, *frame);
+								LOG_DEBUG << "Sending keys : " << frame->PacketSize() << " bytes";
 								auth_state = AUTH_KEY_EXCHANGE;
 								break;
 							}
 							case AUTH_KEY_REPLY:
 								// We received reply
-								auto body = reinterpret_cast<KeyReplyPacket*>(m->body->data());
+								auto body = m->Content<KeyReplyPacket>();
 								if (body->VerifyVMAC()) {
 									LOG_DEBUG << "Secure key created";
 									auth_state = AUTH_SHARE_KEY;

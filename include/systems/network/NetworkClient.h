@@ -7,7 +7,7 @@
 using namespace network;
 
 namespace Sigma {
-	struct MessageObject;
+	class FrameObject;
 
 	class NetworkClient {
 	public:
@@ -18,9 +18,9 @@ namespace Sigma {
 
 		bool Connect(const char *ip, unsigned short port);
 
-		void SendMessage(unsigned char major, unsigned char minor, char* body, uint32_t len);
+		void SendMessage(unsigned char major, unsigned char minor, const FrameObject& packet);
 
-		std::unique_ptr<MessageObject> RecvMessage();
+		std::unique_ptr<FrameObject> RecvMessage();
 
 		void WaitMessage();
 

@@ -209,7 +209,7 @@ namespace Sigma {
 					auto reply = req->Length();
 					if (reply) {
 						// send salt
-						SendMessage(req->fd, 1, 2, req);
+						req->SendMessage(req->fd, 1, 2);
 						GetAuthStateMap()->At(req->fd) = AUTH_KEY_EXCHANGE;
 						LOG_DEBUG << "value = " << (int)(GetAuthStateMap()->At(req->fd));
 						LOG_DEBUG << "Send salt : " << std::string(reinterpret_cast<const char*>(req->Body()), 8);
@@ -237,7 +237,7 @@ namespace Sigma {
 					auto reply_packet = req->Content<KeyExchangePacket>()->ComputeSessionKey();
 					if(reply_packet) {
 						LOG_DEBUG << "VMAC check passed";
-						SendMessage(req->fd, NET_MSG, AUTH_KEY_REPLY, reply_packet);
+						reply_packet->SendMessage(req->fd, NET_MSG, AUTH_KEY_REPLY);
 						GetAuthStateMap()->At(req->fd) = AUTH_SHARE_KEY;
 						continue;
 					}
@@ -252,7 +252,7 @@ namespace Sigma {
 
 	int NetworkSystem::RetrieveSalt(std::shared_ptr<FrameObject> frame, AtomicQueue<std::shared_ptr<FrameObject>>* output) {
 		auto reply = std::make_shared<FrameObject>(frame->fd);
-		reply->CreateBodySpace(sizeof(SendSaltPacket));
+		reply->Resize(sizeof(SendSaltPacket));
 		// TODO : salt is hardcoded !!!
 		// AuthInitPacket* packet = reinterpret_cast<AuthInitPacket*>(frame->Body());
 		// GetSaltFromsomewhere(reply->Body(), packet->login);
@@ -270,11 +270,6 @@ namespace Sigma {
 			auto frame = req->reassembled_frame;
 			char* buffer = reinterpret_cast<char*>(frame->Length());
 
-			if (! buffer ) {
-				frame->CreateFrameSpace(target_size);
-				buffer = reinterpret_cast<char*>(frame->Length());
-			}
-
 			auto current_size = req->length_got;
 
 			auto len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
@@ -287,9 +282,8 @@ namespace Sigma {
 				auto length = frame->Length()->length;
 				target_size = frame->Length()->length + sizeof(Frame_hdr);
 				req->length_requested = target_size;
-				frame->CreateBodySpace(target_size);
+				frame->Resize(length);
 				buffer = reinterpret_cast<char*>(frame->Length());
-				frame->Length()->length = length;
 			}
 
 			if (current_size < target_size) {
@@ -303,32 +297,5 @@ namespace Sigma {
 			}
 		}
 		return NEXT;
-	}
-
-	void NetworkSystem::SendMessage(int fd, unsigned char major, unsigned char minor, char* body, uint32_t len) {
-		Frame frame;
-		frame.mheader.type_major = major;
-		frame.mheader.type_minor = minor;
-		frame.fheader.length = len + sizeof(msg_hdr);
-		LOG_DEBUG << "Sending frame of length " << frame.fheader.length;
-		auto cx = TCPConnection(fd, NETA_IPv4, SCS_CONNECTED);
-		cx.Send(reinterpret_cast<char*>(&frame), sizeof(Frame));
-		cx.Send(body, len);
-	}
-
-	void NetworkSystem::SendMessage(int fd, unsigned char major, unsigned char minor, const std::shared_ptr<FrameObject>& frame) {
-		auto header = frame->Header();
-		header->type_major = major;
-		header->type_minor = minor;
-		auto frame_h = frame->Header();
-		frame->Length()->length = frame->PacketSize() - sizeof(Frame_hdr);
-		LOG_DEBUG << "Sending frame of length " << frame->Length()->length;
-		LOG_DEBUG << "Sending length with length " << sizeof(Frame_hdr);
-		LOG_DEBUG << "Sending header with length " << sizeof(msg_hdr);
-		LOG_DEBUG << "Sending body of length " << frame->Length()->length - sizeof(msg_hdr);
-		LOG_DEBUG << "Sending packet of length " << frame->PacketSize();
-		if (TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Send(reinterpret_cast<char*>(frame->Length()), frame->PacketSize()) <= 0) {
-			LOG_ERROR << "could not send data" ;
-		};
 	}
 }

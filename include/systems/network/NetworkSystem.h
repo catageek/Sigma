@@ -41,9 +41,6 @@ namespace Sigma {
 
 		ThreadPool* GetThreadPool() { return &thread_pool; };
 
-		static void SendMessage(int fd, unsigned char major, unsigned char minor, char* body, uint32_t len);
-		static void SendMessage(int fd, unsigned char major, unsigned char minor, const std::shared_ptr<FrameObject>& frame);
-
 		AtomicMap<int,char>* GetAuthStateMap() { return &auth_state; };
 		AtomicQueue<std::shared_ptr<FrameObject>>* GetAuthRequestQueue() { return &authentication_req; };
 		AtomicQueue<std::shared_ptr<FrameObject>>* GetSaltRequestQueue() { return &salt_req; };
