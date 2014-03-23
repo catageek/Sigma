@@ -9,44 +9,67 @@
 
 #define LOGIN_FIELD_SIZE	16
 #define SALT_SIZE			8
+#define ALEA_SIZE			16
+#define NONCE2_SIZE			16
+#define	NONCE_SIZE			8
+#define VMAC_SIZE			8
+#define VMAC_MSG_SIZE		(ALEA_SIZE + NONCE2_SIZE + NONCE_SIZE)
 
-#define AUTH_INIT		1
-#define SEND_SALT		2
-#define DH_EXCHANGE		3
-#define DH_SHARE_KEY	4
-#define AUTHENTICATED	5
-#define USER_UNKNOWN	16
+#define AUTH_NONE			0
+#define AUTH_INIT			1
+#define AUTH_SEND_SALT		2
+#define AUTH_KEY_EXCHANGE	3
+#define AUTH_KEY_REPLY		4
+#define AUTH_SHARE_KEY		5
+#define AUTHENTICATED		5
 
 // The server stores salt and SHA-256(salt,SHA-256(login|":"|password)), salt being chosen randomly
 
 namespace Sigma {
 	struct GetSaltTaskRequest;
-	struct DHKeyExchangePacket;
+	struct KeyExchangePacket;
 
 	class Authentication {
 	public:
 		static Crypto* GetCryptoEngine() { return &crypto; };
-		static bool ComputeSharedSecretKey(const DHKeyExchangePacket& packet);
 		static void SetSalt(std::unique_ptr<std::vector<byte>>&& salt) { crypto.SetSalt(std::move(salt)); };
-		static std::shared_ptr<DHKeyExchangePacket> GetDHKeysPacket();
+		static std::shared_ptr<KeyExchangePacket> GetKeyExchangePacket();
 	private:
 		static Crypto crypto;
 	};
 
-	struct DHKeyExchangePacket {
-		byte dhkey[32];										// DH public key
-		byte alea[16];										// A random number used to derive the key
-		byte nonce[8];										// a random number used as nonce
-		byte vmac[8];										// VMAC of the message
+	struct KeyExchangePacket;
 
-		bool ComputeSharedKey() {
-			if(! VerifyVMAC()) {
-				return false;
-			}
-			// TODO
-			return true;
-		}
+	struct KeyReplyPacket {
+		friend KeyExchangePacket;
+		bool VerifyVMAC();
 	private:
+		bool Compute(const byte* m);
+		byte challenge[NONCE2_SIZE];
+		byte vmac[VMAC_SIZE];
+	};
+
+	struct KeyExchangePacket {
+		byte alea[ALEA_SIZE];								// Random number used to derive the shared secret
+		byte nonce2[NONCE2_SIZE];							// A random number used as nonce for the VMAC hasher to build
+		byte nonce[NONCE_SIZE];								// a random number used as nonce for the VMAC of this packet
+		byte vmac[VMAC_SIZE];								// VMAC of the message using nonce and shared secret
+
+		std::shared_ptr<FrameObject> ComputeSessionKey() {
+			if(! VerifyVMAC()) {
+				return std::shared_ptr<FrameObject>();
+			}
+			if(! VMAC_BuildHasher()) {
+				return std::shared_ptr<FrameObject>();
+			}
+			auto ret = std::make_shared<FrameObject>();
+			if(! ret->Content<KeyReplyPacket>()->Compute(nonce2)) {
+				return std::shared_ptr<FrameObject>();
+			}
+			return ret;
+		}
+
+		bool VMAC_BuildHasher();
 		bool VerifyVMAC();
 	};
 

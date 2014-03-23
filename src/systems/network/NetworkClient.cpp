@@ -32,6 +32,7 @@ namespace Sigma {
 		AuthInitPacket packet;
 		std::strncpy(packet.login, login, LOGIN_FIELD_SIZE - 1);
 		SendMessage(NET_MSG, AUTH_INIT, reinterpret_cast<char*>(&packet), sizeof(AuthInitPacket));
+		auth_state = AUTH_INIT;
 		return true;
 	}
 
@@ -79,22 +80,30 @@ namespace Sigma {
 					{
 						auto minor = header->type_minor;
 						switch(minor) {
-							case SEND_SALT:
+							case AUTH_SEND_SALT:
 							{
 								// We must send DH keys
 								auto body = reinterpret_cast<SendSaltPacket*>(m->body->data());
 								LOG_DEBUG << "salt received : " << std::string(reinterpret_cast<const char*>(body->salt), 8);
 								Authentication::SetSalt(std::unique_ptr<std::vector<unsigned char>>(m->body.get()));
-								auto dhkeys = Authentication::GetDHKeysPacket();
-								SendMessage(NET_MSG, DH_EXCHANGE, reinterpret_cast<char*>(dhkeys.get()), sizeof(DHKeyExchangePacket));
-								LOG_DEBUG << "Sending DH keys : " << sizeof(DHKeyExchangePacket) << " bytes";
+								auto dhkeys = Authentication::GetKeyExchangePacket();
+								dhkeys->VMAC_BuildHasher();
+								SendMessage(NET_MSG, AUTH_KEY_EXCHANGE, reinterpret_cast<char*>(dhkeys.get()), sizeof(KeyExchangePacket));
+								LOG_DEBUG << "Sending keys : " << sizeof(KeyExchangePacket) << " bytes";
+								auth_state = AUTH_KEY_EXCHANGE;
 								break;
 							}
-							case DH_EXCHANGE:
-								// We received DH Keys
-								auto body = reinterpret_cast<DHKeyExchangePacket*>(m->body.get());
-								if (Authentication::ComputeSharedSecretKey(*body))
+							case AUTH_KEY_REPLY:
+								// We received reply
+								auto body = reinterpret_cast<KeyReplyPacket*>(m->body->data());
+								if (body->VerifyVMAC()) {
 									LOG_DEBUG << "Secure key created";
+									auth_state = AUTH_SHARE_KEY;
+								}
+								else {
+									LOG_DEBUG << "VMAC failed";
+									auth_state = AUTH_NONE;
+								}
 								break;
 						}
 					break;
@@ -103,6 +112,7 @@ namespace Sigma {
 			}
 			else {
 				LOG_DEBUG << "Closing connection";
+				auth_state = AUTH_NONE;
 				cnx.Close();
 				return;
 			}

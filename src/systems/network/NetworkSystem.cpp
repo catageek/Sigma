@@ -64,7 +64,7 @@ namespace Sigma {
 	void NetworkSystem::CloseConnection(int fd) {
 		poller.Unwatch(fd);
 		TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Close();
-		NetworkSystem::GetStatefulMap()->Erase(fd);
+		NetworkSystem::GetAuthStateMap()->Erase(fd);
 	}
 
 	void NetworkSystem::SetPipeline() {
@@ -98,11 +98,11 @@ namespace Sigma {
 						poller.Watch(c.Handle());
 						LOG_DEBUG << "connect " << c.Handle();
 //						c.Send("welcome!\n");
-						GetStatefulMap()->Insert(c.Handle(), AUTH_INIT);
+						GetAuthStateMap()->Insert(c.Handle(), AUTH_INIT);
 					}
 					else if (evList[i].flags & EVFILT_READ) {
 						// Data received
-						if (! GetStatefulMap()->Count(fd) || GetStatefulMap()->At(fd) != AUTHENTICATED) {
+						if (! GetAuthStateMap()->Count(fd) || GetAuthStateMap()->At(fd) != AUTHENTICATED) {
 							// Data received, not authenticated
 							// Request the frame header
 							// We stop watching the connection until we got all the frame
@@ -171,14 +171,14 @@ namespace Sigma {
 										GetThreadPool()->Queue(std::make_shared<TaskReq<block_t>>(std::bind(&NetworkSystem::RetrieveSalt, this, req, NetworkSystem::GetSaltRetrievedQueue())));
 										break;
 									}
-								case DH_EXCHANGE:
+								case AUTH_KEY_EXCHANGE:
 									{
-										if(! GetStatefulMap()->Count(req->fd) || GetStatefulMap()->At(req->fd) != DH_EXCHANGE) {
+										if(! GetAuthStateMap()->Count(req->fd) || GetAuthStateMap()->At(req->fd) != AUTH_KEY_EXCHANGE) {
 											// This is not the packet expected
 											LOG_DEBUG << "Unexpected packet received with length = " << req->Length()->length;
 											CloseConnection(req->fd);
 										}
-										NetworkSystem::GetDHKeyExchangeQueue()->Push(req);
+										NetworkSystem::GetKeyReceivedQueue()->Push(req);
 										GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(shared_secret_key, 0));
 										break;
 									}
@@ -210,8 +210,8 @@ namespace Sigma {
 					if (reply) {
 						// send salt
 						SendMessage(req->fd, 1, 2, req);
-						GetStatefulMap()->At(req->fd) = DH_EXCHANGE;
-						LOG_DEBUG << "value = " << (int)(GetStatefulMap()->At(req->fd));
+						GetAuthStateMap()->At(req->fd) = AUTH_KEY_EXCHANGE;
+						LOG_DEBUG << "value = " << (int)(GetAuthStateMap()->At(req->fd));
 						LOG_DEBUG << "Send salt : " << std::string(reinterpret_cast<const char*>(req->Body()), 8);
 						// Wait reply
 						poller.Watch(req->fd);
@@ -231,12 +231,14 @@ namespace Sigma {
 
 		shared_secret_key = chain_t({
 			[&](){
-				auto req_list = NetworkSystem::GetDHKeyExchangeQueue()->Poll();
+				auto req_list = NetworkSystem::GetKeyReceivedQueue()->Poll();
 				LOG_DEBUG << "got " << req_list->size() << " DH Key events";
 				for (auto& req : *req_list) {
-					DHKeyExchangePacket* packet = reinterpret_cast<DHKeyExchangePacket*>(req->Body());
-					if(packet->ComputeSharedKey()) {
+					auto reply_packet = req->Content<KeyExchangePacket>()->ComputeSessionKey();
+					if(reply_packet) {
 						LOG_DEBUG << "VMAC check passed";
+						SendMessage(req->fd, NET_MSG, AUTH_KEY_REPLY, reply_packet);
+						GetAuthStateMap()->At(req->fd) = AUTH_SHARE_KEY;
 						continue;
 					}
 					else {
@@ -301,9 +303,6 @@ namespace Sigma {
 			}
 		}
 		return NEXT;
-	}
-
-	inline void NetworkSystem::RequestPublicFrameAsync(int fd, size_t len) {
 	}
 
 	void NetworkSystem::SendMessage(int fd, unsigned char major, unsigned char minor, char* body, uint32_t len) {

@@ -53,6 +53,15 @@ namespace Sigma {
 	class FrameObject {
 	public:
 		FrameObject(int f) : fd(f), packet_size(0) {};
+		FrameObject() : fd(-1), packet_size(0) {};
+
+		template<class T>
+		T* Content() {
+			if(! data) {
+				CreateBodySpace(sizeof(T));
+			}
+			return reinterpret_cast<T*>(Body());
+		}
 
 		void CreateFrameSpace(uint32_t len) {
 			data.reset(new std::vector<char>(len));

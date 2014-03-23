@@ -56,13 +56,28 @@ namespace Sigma {
 		std::memcpy(buffer, _pub, _dh.PublicKeyLength());
 	}
 
-	void Crypto::VMAC(byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce) {
+	void Crypto::VMAC64(byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce) {
 		CryptoPP::VMAC<CryptoPP::AES, 64> hasher;
 		hasher.SetKey(key, 16, MakeParameters(Name::IV(), ConstByteArrayParameter(nonce, 8), false));
 		hasher.CalculateDigest(digest, message, len);
 		Integer vmac, nonc, k, m;
 		vmac.Decode(digest, 8);
 		nonc.Decode(nonce, 8);
+		k.Decode(key, 16);
+		m.Decode(message, len);
+		std::cout << "VMAC is " << std::hex << vmac << std::endl;
+		std::cout << "nonce is " << std::hex << nonc << std::endl;
+		std::cout << "key is " << std::hex << k << std::endl;
+		std::cout << "message is " << std::hex << m << std::endl;
+	}
+
+	void Crypto::VMAC128(byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce) {
+		CryptoPP::VMAC<CryptoPP::AES, 128> hasher;
+		hasher.SetKey(key, 16, MakeParameters(Name::IV(), ConstByteArrayParameter(nonce, 16), false));
+		hasher.CalculateDigest(digest, message, len);
+		Integer vmac, nonc, k, m;
+		vmac.Decode(digest, 16);
+		nonc.Decode(nonce, 16);
 		k.Decode(key, 16);
 		m.Decode(message, len);
 		std::cout << "VMAC is " << std::hex << vmac << std::endl;

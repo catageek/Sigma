@@ -11,7 +11,7 @@ namespace Sigma {
 
 	class NetworkClient {
 	public:
-		NetworkClient() {};
+		NetworkClient() : auth_state(0) {};
 		virtual ~NetworkClient() {};
 
 		void Start();
@@ -25,6 +25,7 @@ namespace Sigma {
 		void WaitMessage();
 
 	private:
+		uint32_t auth_state;
 		TCPConnection cnx;
 	};
 }
