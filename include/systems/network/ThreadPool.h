@@ -37,6 +37,7 @@ namespace Sigma {
 	template<class T>
 	struct TaskReq : TaskQueueElement {
 		TaskReq(T&& funct) : funct(std::forward<T>(funct)), TaskQueueElement(std::chrono::steady_clock::now()) {};
+		TaskReq(T& funct) : funct(std::forward<T>(funct)), TaskQueueElement(std::chrono::steady_clock::now()) {};
 		virtual ~TaskReq() {};
 
 		bool operator==(const TaskQueueElement& tqe) const {

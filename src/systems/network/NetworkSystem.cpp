@@ -13,7 +13,10 @@
 using namespace network;
 
 namespace Sigma {
-	NetworkSystem::NetworkSystem() : poller(), thread_pool(5) {};
+	NetworkSystem::NetworkSystem() {};
+
+	ThreadPool NetworkSystem::thread_pool(5);
+	IOPoller NetworkSystem::poller;
 
 	bool NetworkSystem::Start(const char *ip, unsigned short port) {
 		Authentication::GetCryptoEngine()->InitializeDH();
@@ -64,7 +67,7 @@ namespace Sigma {
 	void NetworkSystem::CloseConnection(int fd) {
 		poller.Unwatch(fd);
 		TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Close();
-		NetworkSystem::GetAuthStateMap()->Erase(fd);
+		Authentication::GetAuthStateMap()->Erase(fd);
 	}
 
 	void NetworkSystem::SetPipeline() {
@@ -98,11 +101,11 @@ namespace Sigma {
 						poller.Watch(c.Handle());
 						LOG_DEBUG << "connect " << c.Handle();
 //						c.Send("welcome!\n");
-						GetAuthStateMap()->Insert(c.Handle(), AUTH_INIT);
+						Authentication::GetAuthStateMap()->Insert(c.Handle(), AUTH_INIT);
 					}
 					else if (evList[i].flags & EVFILT_READ) {
 						// Data received
-						if (! GetAuthStateMap()->Count(fd) || GetAuthStateMap()->At(fd) != AUTHENTICATED) {
+						if (! Authentication::GetAuthStateMap()->Count(fd) || Authentication::GetAuthStateMap()->At(fd) != AUTHENTICATED) {
 							// Data received, not authenticated
 							// Request the frame header
 							// We stop watching the connection until we got all the frame
@@ -126,29 +129,6 @@ namespace Sigma {
 		unauthenticated_recv_data = chain_t({
 			// Get the length
 			std::bind(&NetworkSystem::ReassembleFrame, &pub_rawframe_req, &pub_frame_req, &thread_pool, &unauthenticated_recv_data, 0),
-/*			// Read the length and get all the message
-			[&](){
-				auto req_list = NetworkSystem::GetPublicReassembledFrameQueue()->Poll();
-				LOG_DEBUG << "got " << req_list->size() << " Get msg length events";
-				for (auto& req : *req_list) {
-					Frame_hdr* fheader = req->Length();
-					if(fheader->length >= 512) {
-						LOG_ERROR << "Length is more than 512 bytes for a public message. Closing connection";
-						CloseConnection(req->fd);
-					}
-					LOG_DEBUG << "Reading length of " << fheader->length;
-					// Update the length to read
-					req->requested_length = fheader->length + sizeof(Frame_hdr);
-					// We stop watching the connection until we got all the frame
-					poller.Unwatch(fd);
-					// Reading the rest of the packet
-					NetworkSystem::GetPublicRawFrameReqQueue()->Push(std::move(req));
-				}
-				return NEXT;
-			},
-			// Get the messages
-			std::bind(&NetworkSystem::ReassembleFrame, &pub_rawframe_req, &pub_frame_req, &thread_pool, &unauthenticated_recv_data, 2),
-*/			// Read the messages and dispatch
 			[&](){
 				auto req_list = NetworkSystem::GetPublicReassembledFrameQueue()->Poll();
 				LOG_DEBUG << "got " << req_list->size() << " PublicDispatchReq events";
@@ -167,19 +147,14 @@ namespace Sigma {
 							switch(minor) {
 								case AUTH_INIT:
 									{
-										NetworkSystem::GetAuthRequestQueue()->Push(req);
-										GetThreadPool()->Queue(std::make_shared<TaskReq<block_t>>(std::bind(&NetworkSystem::RetrieveSalt, this, req, NetworkSystem::GetSaltRetrievedQueue())));
+										network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_INIT>()->Push(req);
+										GetThreadPool()->Queue(std::make_shared<TaskReq<block_t>>(block_t(&network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_INIT>)));
 										break;
 									}
 								case AUTH_KEY_EXCHANGE:
 									{
-										if(! GetAuthStateMap()->Count(req->fd) || GetAuthStateMap()->At(req->fd) != AUTH_KEY_EXCHANGE) {
-											// This is not the packet expected
-											LOG_DEBUG << "Unexpected packet received with length = " << req->Length()->length;
-											CloseConnection(req->fd);
-										}
-										NetworkSystem::GetKeyReceivedQueue()->Push(req);
-										GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(shared_secret_key, 0));
+										network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_KEY_EXCHANGE>()->Push(req);
+										GetThreadPool()->Queue(std::make_shared<TaskReq<block_t>>(block_t(&network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE>)));
 										break;
 									}
 								default:
@@ -198,68 +173,6 @@ namespace Sigma {
 				return NEXT;
 			}
 		});
-
-		request_authentication = chain_t({
-			// Send salt of the user
-			[&](){
-				auto req_list = NetworkSystem::GetSaltRetrievedQueue()->Poll();
-				LOG_DEBUG << "got " << req_list->size() << " SaltRetrieved events";
-				for (auto& req : *req_list) {
-
-					auto reply = req->Length();
-					if (reply) {
-						// send salt
-						req->SendMessage(req->fd, 1, 2);
-						GetAuthStateMap()->At(req->fd) = AUTH_KEY_EXCHANGE;
-						LOG_DEBUG << "value = " << (int)(GetAuthStateMap()->At(req->fd));
-						LOG_DEBUG << "Send salt : " << std::string(reinterpret_cast<const char*>(req->Body()), 8);
-						// Wait reply
-						poller.Watch(req->fd);
-					}
-					else {
-						// close connection
-						// TODO: send error message
-						//TCPConnection(req->fd, NETA_IPv4, SCS_CONNECTED).Send(reinterpret_cast<char*>(challenge.get()), sizeof(*challenge));
-						LOG_DEBUG << "User unknown";
-						CloseConnection(req->fd);
-					}
-				}
-				return STOP;
-			}
-
-		});
-
-		shared_secret_key = chain_t({
-			[&](){
-				auto req_list = NetworkSystem::GetKeyReceivedQueue()->Poll();
-				LOG_DEBUG << "got " << req_list->size() << " DH Key events";
-				for (auto& req : *req_list) {
-					auto reply_packet = req->Content<KeyExchangePacket>()->ComputeSessionKey();
-					if(reply_packet) {
-						LOG_DEBUG << "VMAC check passed";
-						reply_packet->SendMessage(req->fd, NET_MSG, AUTH_KEY_REPLY);
-						GetAuthStateMap()->At(req->fd) = AUTH_SHARE_KEY;
-						continue;
-					}
-					else {
-						LOG_DEBUG << "VMAC check failed";
-					}
-				}
-				return STOP;
-			}
-		});
-	}
-
-	int NetworkSystem::RetrieveSalt(std::shared_ptr<FrameObject> frame, AtomicQueue<std::shared_ptr<FrameObject>>* output) {
-		auto reply = std::make_shared<FrameObject>(frame->fd);
-		reply->Resize(sizeof(SendSaltPacket));
-		// TODO : salt is hardcoded !!!
-		// AuthInitPacket* packet = reinterpret_cast<AuthInitPacket*>(frame->Body());
-		// GetSaltFromsomewhere(reply->Body(), packet->login);
-		std::memcpy(reply->Body(), std::string("abcdefgh").data(), 8);
-		output->Push(std::move(reply));
-		GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(request_authentication, 0));
-		return STOP;
 	}
 
 	int NetworkSystem::ReassembleFrame(AtomicQueue<std::shared_ptr<Frame_req>>* input, AtomicQueue<std::shared_ptr<FrameObject>>* output, ThreadPool* thread_pool, const chain_t* rerun, size_t index) {

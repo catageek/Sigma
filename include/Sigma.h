@@ -20,6 +20,7 @@ namespace Sigma {
 		// To use them just call GetTypeName<MyType>() to retrieve the name for the specified type.
 		template <typename TYPE> const char* GetTypeName(void) { }
 		template <typename TYPE> const unsigned int GetTypeID(void) { }
+		template <int MAJOR,int MINOR> const char* GetNetworkHandler(void) {}
 	}
 }
 

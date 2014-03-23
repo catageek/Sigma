@@ -6,6 +6,7 @@
 #include "systems/network/AtomicMap.hpp"
 #include "systems/network/NetworkSystem.h"
 #include "systems/network/Crypto.h"
+#include "INetworkPacketHandler.h"
 
 #define LOGIN_FIELD_SIZE	16
 #define SALT_SIZE			8
@@ -33,8 +34,11 @@ namespace Sigma {
 	public:
 		static Crypto* GetCryptoEngine() { return &crypto; };
 		static void SetSalt(std::unique_ptr<std::vector<byte>>&& salt) { crypto.SetSalt(std::move(salt)); };
+		static AtomicMap<int,char>* GetAuthStateMap() { return &auth_state; };
 	private:
 		static Crypto crypto;
+		static AtomicMap<int,char> auth_state;						// state of the connections
+
 	};
 
 	struct KeyExchangePacket;
@@ -80,15 +84,6 @@ namespace Sigma {
 	struct AuthInitPacket {
 		msg_hdr header;
 		char login[LOGIN_FIELD_SIZE];
-
-	private:
-		byte* GetSalt() const {
-			// TODO
-			return nullptr;
-		}
-
-		static AtomicMap<int, std::shared_ptr<GetSaltTaskRequest>> salt_req;
-
 	};
 
 	struct GetSaltTaskRequest {
