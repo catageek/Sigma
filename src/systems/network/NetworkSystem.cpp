@@ -21,6 +21,7 @@ namespace Sigma {
 	bool NetworkSystem::Start(const char *ip, unsigned short port) {
 		Authentication::GetCryptoEngine()->InitializeDH();
 		SetPipeline();
+		thread_pool.Initialize();
 
 		if (! poller.Initialize()) {
 			LOG_ERROR << "Could not initialize kqueue !";
@@ -128,9 +129,12 @@ namespace Sigma {
 
 		unauthenticated_recv_data = chain_t({
 			// Get the length
-			std::bind(&NetworkSystem::ReassembleFrame, &pub_rawframe_req, &pub_frame_req, &thread_pool, &unauthenticated_recv_data, 0),
+			std::bind(&NetworkSystem::ReassembleFrame, &pub_rawframe_req, &pub_frame_req, &thread_pool),
 			[&](){
 				auto req_list = NetworkSystem::GetPublicReassembledFrameQueue()->Poll();
+				if (! req_list) {
+					return STOP;
+				}
 				LOG_DEBUG << "got " << req_list->size() << " PublicDispatchReq events";
 				for (auto& req : *req_list) {
 					msg_hdr* header = req->Header();
@@ -148,7 +152,11 @@ namespace Sigma {
 								case AUTH_INIT:
 									{
 										network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_INIT>()->Push(req);
-										GetThreadPool()->Queue(std::make_shared<TaskReq<block_t>>(block_t(&network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_INIT>)));
+										auto handler = new chain_t({
+											block_t(&network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_INIT>),
+											block_t(&network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_SEND_SALT>)
+										});
+										GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(std::shared_ptr<chain_t>(handler), 0));
 										break;
 									}
 								case AUTH_KEY_EXCHANGE:
@@ -170,13 +178,16 @@ namespace Sigma {
 						}
 					}
 				}
-				return NEXT;
+				return STOP;
 			}
 		});
 	}
 
-	int NetworkSystem::ReassembleFrame(AtomicQueue<std::shared_ptr<Frame_req>>* input, AtomicQueue<std::shared_ptr<FrameObject>>* output, ThreadPool* thread_pool, const chain_t* rerun, size_t index) {
+	int NetworkSystem::ReassembleFrame(AtomicQueue<std::shared_ptr<Frame_req>>* input, AtomicQueue<std::shared_ptr<FrameObject>>* output, ThreadPool* thread_pool) {
 		auto req_list = input->Poll();
+		if (!req_list) {
+			return STOP;
+		}
 		LOG_DEBUG << "got " << req_list->size() << " Reassemble frame requests";
 		for (auto& req : *req_list) {
 			auto target_size = req->length_requested;
@@ -202,13 +213,12 @@ namespace Sigma {
 			if (current_size < target_size) {
 				// we put again the request in the queue
 				input->Push(req);
-				thread_pool->Queue(std::make_shared<TaskReq<chain_t>>(*rerun, index));
 			}
 			else {
 				LOG_DEBUG << "Packet of " << current_size << " put in dispatch queue.";
 				output->Push(frame);
 			}
 		}
-		return NEXT;
+		return SPLIT;
 	}
 }

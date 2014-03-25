@@ -3,10 +3,17 @@
 #include <iostream>
 
 namespace Sigma {
+	std::function<void(std::shared_ptr<TaskReq<chain_t>>)> TaskReq<chain_t>::queue_task;
+
+
 	ThreadPool::ThreadPool(unsigned int nr_thread) : counter(0) {
 		for (auto i = 0; i < nr_thread; ++i) {
 			std::thread(&ThreadPool::Poll, this).detach();
 		}
+	}
+
+	void ThreadPool::Initialize() {
+		TaskReq<chain_t>::Initialize([&](std::shared_ptr<TaskReq<chain_t>> c) { Queue(c); });
 	}
 
 	void ThreadPool::Poll() {

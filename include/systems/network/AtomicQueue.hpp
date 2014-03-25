@@ -16,6 +16,9 @@ namespace Sigma {
 		AtomicQueue() : q(atomic_queue<T>(new std::list<T>)) {};
 
 		atomic_queue<T> Poll() {
+			if (! q->size()) {
+				return atomic_queue<T>();
+			}
 			mtx.lock();
 			auto ret = std::move(q);
 			q.reset(new std::list<T>());

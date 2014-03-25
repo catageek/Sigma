@@ -64,7 +64,7 @@ namespace Sigma {
 
 		static void CloseConnection(int fd);
 
-		static int ReassembleFrame(AtomicQueue<std::shared_ptr<Frame_req>>* input, AtomicQueue<std::shared_ptr<FrameObject>>* output, ThreadPool* threadpool, const chain_t* rerun, size_t index);
+		static int ReassembleFrame(AtomicQueue<std::shared_ptr<Frame_req>>* input, AtomicQueue<std::shared_ptr<FrameObject>>* output, ThreadPool* threadpool);
 
 		int ssocket;											// the listening socket
 		static IOPoller poller;

@@ -52,71 +52,76 @@ namespace Sigma {
 	namespace network_packet_handler {
 		template<>
 		int INetworkPacketHandler::Process<NET_MSG,AUTH_SEND_SALT>() {
-			LOG_DEBUG << "process init packet...";
-			while(auto req_list = GetQueue<NET_MSG,AUTH_SEND_SALT>()->Poll()) {
-				for(auto& req : *req_list) {
-					auto reply = req->Length();
-					if (reply) {
-						// send salt
-						req->SendMessage(req->fd, 1, 2);
-						Authentication::GetAuthStateMap()->At(req->fd) = AUTH_KEY_EXCHANGE;
-						LOG_DEBUG << "value = " << (int)(Authentication::GetAuthStateMap()->At(req->fd));
-						LOG_DEBUG << "Send salt : " << std::string(req->Content<SendSaltPacket,char>(), 8);
-						// Wait reply
-						NetworkSystem::Poller()->Watch(req->fd);
-					}
-					else {
-						// close connection
-						// TODO: send error message
-						//TCPConnection(req->fd, NETA_IPv4, SCS_CONNECTED).Send(reinterpret_cast<char*>(challenge.get()), sizeof(*challenge));
-						LOG_DEBUG << "User unknown";
-						NetworkSystem::CloseConnection(req->fd);
-					}
+			auto req_list = GetQueue<NET_MSG,AUTH_SEND_SALT>()->Poll();
+			if (!req_list) {
+				return STOP;
+			}
+			for(auto& req : *req_list) {
+				auto reply = req->Length();
+				if (reply) {
+					// send salt
+					req->SendMessage(req->fd, 1, 2);
+					Authentication::GetAuthStateMap()->At(req->fd) = AUTH_KEY_EXCHANGE;
+					LOG_DEBUG << "value = " << (int)(Authentication::GetAuthStateMap()->At(req->fd));
+					LOG_DEBUG << "Send salt : " << std::string(req->Content<SendSaltPacket,char>(), 8);
+					// Wait reply
+					NetworkSystem::Poller()->Watch(req->fd);
+				}
+				else {
+					// close connection
+					// TODO: send error message
+					//TCPConnection(req->fd, NETA_IPv4, SCS_CONNECTED).Send(reinterpret_cast<char*>(challenge.get()), sizeof(*challenge));
+					LOG_DEBUG << "User unknown";
+					NetworkSystem::CloseConnection(req->fd);
 				}
 			}
-			return STOP;
+			return SPLIT;
 		}
 
 		template<>
 		int INetworkPacketHandler::Process<NET_MSG,AUTH_INIT>() {
-			while(auto req_list = GetQueue<NET_MSG,AUTH_INIT>()->Poll()) {
-				for(auto& req : *req_list) {
-					auto reply = std::make_shared<FrameObject>(req->fd);
-					reply->Resize(sizeof(SendSaltPacket));
-					// TODO : salt is hardcoded !!!
-					auto login = req->Content<AuthInitPacket>()->login;
-					// GetSaltFromsomewhere(reply->Body(), packet->login);
-					std::memcpy(reply->Content<SendSaltPacket,char>(), std::string("abcdefgh").data(), 8);
-					LOG_DEBUG << "Queing salt to send";
-					GetQueue<NET_MSG,AUTH_SEND_SALT>()->Push(std::move(reply));
-					NetworkSystem::GetThreadPool()->Queue(std::make_shared<TaskReq<block_t>>(block_t(&INetworkPacketHandler::Process<NET_MSG,AUTH_SEND_SALT>)));
-				}
+			auto req_list = GetQueue<NET_MSG,AUTH_INIT>()->Poll();
+			if (!req_list) {
+				return STOP;
 			}
-			return STOP;
+			for(auto& req : *req_list) {
+				auto reply = std::make_shared<FrameObject>(req->fd);
+				reply->Resize(sizeof(SendSaltPacket));
+				// TODO : salt is hardcoded !!!
+				auto login = req->Content<AuthInitPacket>()->login;
+				// GetSaltFromsomewhere(reply->Body(), packet->login);
+				std::memcpy(reply->Content<SendSaltPacket,char>(), std::string("abcdefgh").data(), 8);
+				LOG_DEBUG << "Queing salt to send";
+				GetQueue<NET_MSG,AUTH_SEND_SALT>()->Push(std::move(reply));
+			}
+			return SPLIT;
 		}
 
 		template<>
 		int INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE>() {
-			while(auto req_list = GetQueue<NET_MSG,AUTH_KEY_EXCHANGE>()->Poll()) {
-				for(auto& req : *req_list) {
-					if(! Authentication::GetAuthStateMap()->Count(req->fd) || Authentication::GetAuthStateMap()->At(req->fd) != AUTH_KEY_EXCHANGE) {
-						// This is not the packet expected
-						LOG_DEBUG << "Unexpected packet received with length = " << req->Length()->length;
-						NetworkSystem::CloseConnection(req->fd);
-					}
-					auto reply_packet = req->Content<KeyExchangePacket>()->ComputeSessionKey();
-					if(reply_packet) {
-						LOG_DEBUG << "VMAC check passed";
-						reply_packet->SendMessage(req->fd, NET_MSG, AUTH_KEY_REPLY);
-						Authentication::GetAuthStateMap()->At(req->fd) = AUTH_SHARE_KEY;
-						continue;
-					}
-					else {
-						LOG_DEBUG << "VMAC check failed";
-					}
+			auto req_list = GetQueue<NET_MSG,AUTH_KEY_EXCHANGE>()->Poll();
+			if (!req_list) {
+				return STOP;
+			}
+			for(auto& req : *req_list) {
+				if(! Authentication::GetAuthStateMap()->Count(req->fd) || Authentication::GetAuthStateMap()->At(req->fd) != AUTH_KEY_EXCHANGE) {
+					// This is not the packet expected
+					LOG_DEBUG << "Unexpected packet received with length = " << req->Length()->length;
+					NetworkSystem::CloseConnection(req->fd);
+					continue;
+				}
+				auto reply_packet = req->Content<KeyExchangePacket>()->ComputeSessionKey();
+				if(reply_packet) {
+					LOG_DEBUG << "VMAC check passed";
+					reply_packet->SendMessage(req->fd, NET_MSG, AUTH_KEY_REPLY);
+					Authentication::GetAuthStateMap()->At(req->fd) = AUTH_SHARE_KEY;
+					continue;
+				}
+				else {
+					LOG_DEBUG << "VMAC check failed";
 				}
 			}
-			return STOP;
+			return SPLIT;
 		}
 	}
 
