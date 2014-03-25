@@ -38,7 +38,7 @@ namespace Sigma {
 		//t.detach();
 		ssocket = s->Handle();
 		poller.Watch(ssocket);
-		auto tr = std::make_shared<TaskReq<chain_t>>(start, 0);
+		auto tr = std::make_shared<TaskReq<chain_t>>(start);
 		GetThreadPool()->Queue(tr);
 		return true;
 	}
@@ -113,7 +113,7 @@ namespace Sigma {
 							poller.Unwatch(fd);
 							// queue the task to reassemble the the frame
 							NetworkSystem::GetPublicRawFrameReqQueue()->Push(std::make_shared<Frame_req>(fd));
-							GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(unauthenticated_recv_data, 0));
+							GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(unauthenticated_recv_data));
 						}
 						else {
 							// Data received from authenticated client
@@ -122,8 +122,7 @@ namespace Sigma {
 					}
 				}
 				// Queue a task to wait another event
-				GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(start, 0));
-				return STOP;
+				return SPLIT;
 			}
 		});
 
@@ -156,7 +155,7 @@ namespace Sigma {
 											block_t(&network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_INIT>),
 											block_t(&network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_SEND_SALT>)
 										});
-										GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(std::shared_ptr<chain_t>(handler), 0));
+										GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(std::shared_ptr<chain_t>(handler)));
 										break;
 									}
 								case AUTH_KEY_EXCHANGE:

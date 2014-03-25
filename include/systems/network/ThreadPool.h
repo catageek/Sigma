@@ -57,15 +57,9 @@ namespace Sigma {
 
 	template<>
 	struct TaskReq<chain_t> : TaskQueueElement {
-		TaskReq(chain_t& chain, size_t index) : block_end(chain.cend()), TaskQueueElement(std::chrono::steady_clock::now()) {
-			block = chain.cbegin();
-			std::advance(block, index);
-		};
+		TaskReq(chain_t& chain) : block(chain.cbegin()), block_end(chain.cend()), TaskQueueElement(std::chrono::steady_clock::now()) {};
 
-		TaskReq(std::shared_ptr<chain_t>&& chain, size_t index) : chain(std::move(chain)), block_end(this->chain->cend()), TaskQueueElement(std::chrono::steady_clock::now()) {
-			block = this->chain->cbegin();
-			std::advance(block, index);
-		};
+		TaskReq(std::shared_ptr<chain_t>&& chain) : chain(std::move(chain)), block(this->chain->cbegin()), block_end(this->chain->cend()), TaskQueueElement(std::chrono::steady_clock::now()) {};
 
 		virtual ~TaskReq() {};
 
