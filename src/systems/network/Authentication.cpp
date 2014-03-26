@@ -57,7 +57,7 @@ namespace Sigma {
 				return STOP;
 			}
 			for(auto& req : *req_list) {
-				auto reply = req->Length();
+				auto reply = req->FullFrame();
 				if (reply) {
 					// send salt
 					req->SendMessage(req->fd, 1, 2);
@@ -104,7 +104,7 @@ namespace Sigma {
 			for(auto& req : *req_list) {
 				if(! Authentication::GetAuthStateMap()->Count(req->fd) || Authentication::GetAuthStateMap()->At(req->fd) != AUTH_KEY_EXCHANGE) {
 					// This is not the packet expected
-					LOG_DEBUG << "Unexpected packet received with length = " << req->Length()->length;
+					LOG_DEBUG << "Unexpected packet received with length = " << req->FullFrame()->length;
 					NetworkSystem::CloseConnection(req->fd);
 					continue;
 				}

@@ -42,7 +42,6 @@ namespace Sigma {
 	template<class T>
 	struct TaskReq : TaskQueueElement {
 		TaskReq(T&& funct) : funct(std::forward<T>(funct)), TaskQueueElement(std::chrono::steady_clock::now()) {};
-		TaskReq(T& funct) : funct(std::forward<T>(funct)), TaskQueueElement(std::chrono::steady_clock::now()) {};
 		virtual ~TaskReq() {};
 
 		bool operator==(const TaskQueueElement& tqe) const {
@@ -75,7 +74,8 @@ namespace Sigma {
 				switch(s) {
 				case REPEAT:
 					LOG_DEBUG << "Requeuing...";
-					queue_task(std::make_shared<TaskReq<chain_t>>(*this));
+					// "*this" is now undefined
+					queue_task(std::make_shared<TaskReq<chain_t>>(std::move(*this)));
 				case STOP:
 					return;
 				case SPLIT:
@@ -118,21 +118,15 @@ namespace Sigma {
 
 	private:
 
-		template<class T>
-		void Queue(std::shared_ptr<TaskReq<T>>& task, identity<T>) {
+		template<class T,class U>
+		void Queue(U&& task, identity<T>) {
 			std::unique_lock<std::mutex> locker(m_queue);
-			taskqueue.push_back(task);
+			taskqueue.push_back(std::forward<U>(task));
 			queuecheck.notify_one();
 		}
 
-		template<class T>
-		void Queue(std::shared_ptr<TaskReq<T>>&& task, identity<T>) {
-			std::unique_lock<std::mutex> locker(m_queue);
-			taskqueue.push_back(std::move(task));
-			queuecheck.notify_one();
-		}
-
-		void Queue(std::shared_ptr<TaskReq<chain_t>>& task, identity<chain_t>) {
+		template<class U>
+		void Queue(U&& task, identity<chain_t>) {
 			std::unique_lock<std::mutex> locker(m_queue);
 			for (auto t : taskqueue) {
 				if (t == task) {
@@ -140,19 +134,7 @@ namespace Sigma {
 					return;
 				}
 			}
-			taskqueue.push_back(task);
-			queuecheck.notify_one();
-		}
-
-		void Queue(std::shared_ptr<TaskReq<chain_t>>&& task, identity<chain_t>) {
-			std::unique_lock<std::mutex> locker(m_queue);
-			for (auto t : taskqueue) {
-				if (t == task) {
-					// No duplicate entry
-					return;
-				}
-			}
-			taskqueue.push_back(std::move(task));
+			taskqueue.push_back(std::forward<U>(task));
 			queuecheck.notify_one();
 		}
 

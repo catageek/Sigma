@@ -45,14 +45,14 @@ namespace Sigma {
 
 	class FrameObject {
 	public:
-		FrameObject(int f) : fd(f), packet_size(sizeof(Frame_hdr)), data(std::make_shared<std::vector<char>>(sizeof(Frame_hdr))) {};
-		FrameObject() : fd(-1), packet_size(sizeof(Frame_hdr)), data(std::make_shared<std::vector<char>>(sizeof(Frame_hdr))) {};
+		template<class T=Frame_hdr>
+		FrameObject(int fd = -1) : fd(fd), packet_size(sizeof(T)), data(std::vector<char>(sizeof(T))) {};
 
-		void SendMessage(int fd, unsigned char major, unsigned char minor) const;
+		void SendMessage(int fd, unsigned char major, unsigned char minor);
 
 		void Resize(size_t new_size) {
 			packet_size = new_size + sizeof(Frame);
-			data->resize(packet_size);
+			data.resize(packet_size);
 		}
 
 		template<class T, class U=T>
@@ -65,13 +65,14 @@ namespace Sigma {
 
 		uint32_t PacketSize() const { return packet_size; };
 
-		char* Body() const { return ( data ? data->data() + sizeof(msg_hdr) + sizeof(Frame_hdr) : nullptr); };
-		msg_hdr* Header() const { return reinterpret_cast<msg_hdr*>((data ? data->data() + sizeof(Frame_hdr) : nullptr)); };
-		Frame_hdr* Length() const { return reinterpret_cast<Frame_hdr*>(data ? data->data() : nullptr); };
+		msg_hdr* Header() { return reinterpret_cast<msg_hdr*>((data.size() ? data.data() + sizeof(Frame_hdr) : nullptr)); };
+		Frame_hdr* FullFrame() { return reinterpret_cast<Frame_hdr*>(data.size() ? data.data() : nullptr); };
 
 		int fd;
 	private:
-		std::shared_ptr<std::vector<char>> data;
+		char* Body() { return ( data.size() ? data.data() + sizeof(msg_hdr) + sizeof(Frame_hdr) : nullptr); };
+
+		std::vector<char> data;
 		uint32_t packet_size;
 	};
 }

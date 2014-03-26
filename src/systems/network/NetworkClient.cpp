@@ -36,18 +36,18 @@ namespace Sigma {
 		return true;
 	}
 
-	inline void NetworkClient::SendMessage(unsigned char major, unsigned char minor, const FrameObject& packet) {
+	inline void NetworkClient::SendMessage(unsigned char major, unsigned char minor, FrameObject& packet) {
 		packet.SendMessage(cnx.Handle(), major, minor);
 	}
 
 	std::unique_ptr<FrameObject> NetworkClient::RecvMessage() {
 		auto frame = std::unique_ptr<FrameObject>(new FrameObject());
 		// Get the length
-		auto len = cnx.Recv(reinterpret_cast<char*>(&frame->Length()->length), sizeof(uint32_t));
+		auto len = cnx.Recv(reinterpret_cast<char*>(&frame->FullFrame()->length), sizeof(uint32_t));
 		if (len <= 0) {
 			return std::unique_ptr<FrameObject>();
 		}
-		auto length = frame->Length()->length;
+		auto length = frame->FullFrame()->length;
 		if (len < sizeof(uint32_t) || length < sizeof(msg_hdr)) {
 			LOG_ERROR << "Connection error : received " << len << " bytes as length instead of " << sizeof(uint32_t);
 			return std::unique_ptr<FrameObject>();

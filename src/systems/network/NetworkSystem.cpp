@@ -191,7 +191,7 @@ namespace Sigma {
 		for (auto& req : *req_list) {
 			auto target_size = req->length_requested;
 			auto frame = req->reassembled_frame;
-			char* buffer = reinterpret_cast<char*>(frame->Length());
+			char* buffer = reinterpret_cast<char*>(frame->FullFrame());
 
 			auto current_size = req->length_got;
 
@@ -201,11 +201,11 @@ namespace Sigma {
 
 			if(current_size == sizeof(Frame_hdr) && target_size == sizeof(Frame_hdr)) {
 				// We now have the length
-				auto length = frame->Length()->length;
-				target_size = frame->Length()->length + sizeof(Frame_hdr);
+				auto length = frame->FullFrame()->length;
+				target_size = frame->FullFrame()->length + sizeof(Frame_hdr);
 				req->length_requested = target_size;
 				frame->Resize(length);
-				buffer = reinterpret_cast<char*>(frame->Length());
+				buffer = reinterpret_cast<char*>(frame->FullFrame());
 			}
 
 			if (current_size < target_size) {
