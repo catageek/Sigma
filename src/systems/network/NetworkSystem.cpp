@@ -122,7 +122,7 @@ namespace Sigma {
 					}
 				}
 				// Queue a task to wait another event
-				return SPLIT;
+				return REPEAT;
 			}
 		});
 
@@ -196,7 +196,6 @@ namespace Sigma {
 			auto current_size = req->length_got;
 
 			auto len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
-			LOG_DEBUG << "got " << len << " bytes in reassemble_frame for fd = " << frame->fd << ", expected = " << target_size << " got = " << current_size;
 			current_size += len;
 			req->length_got = current_size;
 

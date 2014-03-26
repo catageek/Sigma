@@ -49,13 +49,11 @@ namespace Sigma {
 			perror ("The following error occurred in Watch(): ");
 			return;
 		}
-		LOG_DEBUG << "watching " << fd;
 	}
 
 	inline void IOPoller::Unwatch(int fd) {
 		IOEvent e(fd, EVFILT_READ, EV_DELETE);
 		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
-		LOG_DEBUG << "unwatching " << fd;
 	}
 
 	inline int IOPoller::Poll(std::vector<struct kevent>& v, const struct timespec *timeout) {

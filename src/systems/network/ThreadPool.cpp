@@ -19,7 +19,6 @@ namespace Sigma {
 	void ThreadPool::Poll() {
 		{
 			std::unique_lock<std::mutex> locker(m_print);
-			std::cout << "running" << std::endl;
 		}
 		while(1) {
 			std::shared_ptr<TaskQueueElement> task;
@@ -35,14 +34,13 @@ namespace Sigma {
 			}
 			{
 				std::unique_lock<std::mutex> locker(m_print);
-				std::cout << "get a task" << std::endl;
 			}
 			{
 				std::unique_lock<std::mutex> locker(m_count);
 				if(counter >= MAX_CONCURRENT_THREAD) {
 					{
 						std::unique_lock<std::mutex> locker(m_print);
-						std::cout << "waiting counter" << std::endl;
+						LOG_DEBUG << "Too many workers. Waiting...";
 					}
 					{
 						// Wait the counter to be under MAX_CONCURRENT_THREAD
@@ -53,7 +51,7 @@ namespace Sigma {
 				counter++;
 				{
 					std::unique_lock<std::mutex> locker(m_print);
-					std::cout << "increment counter" << std::endl;
+					LOG_DEBUG << "Launching new worker. We have " << counter << " worker(s)";
 				}
 			}
 
@@ -62,12 +60,12 @@ namespace Sigma {
 			{
 				std::unique_lock<std::mutex>(m_count);
 				// decrement counter
-				{
-					std::unique_lock<std::mutex> locker(m_print);
-					std::cout << "decrement counter" << std::endl;
-				}
 				counter--;
 				queuecheck.notify_one();
+				{
+					std::unique_lock<std::mutex> locker(m_print);
+					LOG_DEBUG << "Stopping worker. We have " << counter << " worker(s)";
+				}
 			}
 		}
 	}

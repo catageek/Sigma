@@ -6,6 +6,7 @@
 #define		STOP		0
 #define 	SPLIT		1
 #define		CONTINUE	2
+#define		REPEAT		3
 
 #include <chrono>
 #include <functional>
@@ -72,6 +73,9 @@ namespace Sigma {
 			for(auto& b = block, b_end = block_end; b != b_end; ++b) {
 				auto s = (*b)();
 				switch(s) {
+				case REPEAT:
+					LOG_DEBUG << "Requeuing...";
+					queue_task(std::make_shared<TaskReq<chain_t>>(*this));
 				case STOP:
 					return;
 				case SPLIT:
@@ -79,6 +83,7 @@ namespace Sigma {
 					LOG_DEBUG << "Splitting...";
 					queue_task(std::make_shared<TaskReq<chain_t>>(*this));
 				case CONTINUE:
+					LOG_DEBUG << "Jumping to next block...";
 				default:
 					break;
 				}
@@ -153,7 +158,6 @@ namespace Sigma {
 
 		void Poll();
 
-		static ThreadPool instance;
 		std::list<std::shared_ptr<TaskQueueElement>> taskqueue;
 		int counter;
 		std::mutex m_queue;

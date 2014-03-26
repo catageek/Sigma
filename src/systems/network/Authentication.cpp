@@ -62,8 +62,6 @@ namespace Sigma {
 					// send salt
 					req->SendMessage(req->fd, 1, 2);
 					Authentication::GetAuthStateMap()->At(req->fd) = AUTH_KEY_EXCHANGE;
-					LOG_DEBUG << "value = " << (int)(Authentication::GetAuthStateMap()->At(req->fd));
-					LOG_DEBUG << "Send salt : " << std::string(req->Content<SendSaltPacket,char>(), 8);
 					// Wait reply
 					NetworkSystem::Poller()->Watch(req->fd);
 				}
@@ -75,7 +73,7 @@ namespace Sigma {
 					NetworkSystem::CloseConnection(req->fd);
 				}
 			}
-			return SPLIT;
+			return CONTINUE;
 		}
 
 		template<>
@@ -94,7 +92,7 @@ namespace Sigma {
 				LOG_DEBUG << "Queing salt to send";
 				GetQueue<NET_MSG,AUTH_SEND_SALT>()->Push(std::move(reply));
 			}
-			return SPLIT;
+			return CONTINUE;
 		}
 
 		template<>
@@ -121,7 +119,7 @@ namespace Sigma {
 					LOG_DEBUG << "VMAC check failed";
 				}
 			}
-			return SPLIT;
+			return CONTINUE;
 		}
 	}
 
