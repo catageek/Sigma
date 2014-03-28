@@ -17,9 +17,12 @@ namespace Sigma {
 
 	ThreadPool NetworkSystem::thread_pool(5);
 	IOPoller NetworkSystem::poller;
+	Authentication NetworkSystem::authentication;
 
 	bool NetworkSystem::Start(const char *ip, unsigned short port) {
-		Authentication::GetCryptoEngine()->InitializeDH();
+		authentication.Initialize();
+		authentication.GetCryptoEngine()->InitializeDH();
+
 		SetPipeline();
 		thread_pool.Initialize();
 
@@ -68,7 +71,7 @@ namespace Sigma {
 	void NetworkSystem::CloseConnection(int fd) {
 		poller.Unwatch(fd);
 		TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Close();
-		Authentication::GetAuthStateMap()->Erase(fd);
+		NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->Erase(fd);
 	}
 
 	void NetworkSystem::SetPipeline() {
@@ -102,11 +105,11 @@ namespace Sigma {
 						poller.Watch(c.Handle());
 						LOG_DEBUG << "connect " << c.Handle();
 //						c.Send("welcome!\n");
-						Authentication::GetAuthStateMap()->Insert(c.Handle(), AUTH_INIT);
+						NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->Insert(c.Handle(), AUTH_INIT);
 					}
 					else if (evList[i].flags & EVFILT_READ) {
 						// Data received
-						if (! Authentication::GetAuthStateMap()->Count(fd) || Authentication::GetAuthStateMap()->At(fd) != AUTHENTICATED) {
+						if (! NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->Count(fd) || NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->At(fd) != AUTHENTICATED) {
 							// Data received, not authenticated
 							// Request the frame header
 							// We stop watching the connection until we got all the frame
@@ -151,11 +154,7 @@ namespace Sigma {
 								case AUTH_INIT:
 									{
 										network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_INIT>()->Push(req);
-										auto handler = new chain_t({
-											block_t(&network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_INIT>),
-											block_t(&network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_SEND_SALT>)
-										});
-										GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(std::shared_ptr<chain_t>(handler)));
+										network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_INIT>();
 										break;
 									}
 								case AUTH_KEY_EXCHANGE:

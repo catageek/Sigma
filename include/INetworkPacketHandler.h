@@ -1,6 +1,8 @@
 #ifndef INETWORKPACKETHANDLER_H_INCLUDED
 #define INETWORKPACKETHANDLER_H_INCLUDED
 
+#include "systems/network/AtomicQueue.hpp"
+
 namespace Sigma {
 
 	class FrameObject;

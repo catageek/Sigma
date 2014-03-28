@@ -4,9 +4,10 @@
 #include <cstdint>
 #include <memory>
 #include "systems/network/AtomicMap.hpp"
-#include "systems/network/NetworkSystem.h"
+#include "systems/network/ThreadPool.h"
 #include "systems/network/Crypto.h"
 #include "INetworkPacketHandler.h"
+#include "systems/network/Protocol.h"
 
 #define LOGIN_FIELD_SIZE	16
 #define SALT_SIZE			8
@@ -32,13 +33,30 @@ namespace Sigma {
 
 	class Authentication {
 	public:
-		static Crypto* GetCryptoEngine() { return &crypto; };
-		static void SetSalt(std::unique_ptr<std::vector<byte>>&& salt) { crypto.SetSalt(std::move(salt)); };
-		static AtomicMap<int,char>* GetAuthStateMap() { return &auth_state; };
-	private:
-		static Crypto crypto;
-		static AtomicMap<int,char> auth_state;						// state of the connections
+		Authentication()  {};
 
+		void Initialize() {
+			auto f = chain_t({
+				std::bind(&Sigma::Authentication::RetrieveSalt, this),
+				std::bind(&Sigma::Authentication::SendSalt, this)
+			});
+			auth_init_handler = std::make_shared<chain_t>(f);
+		}
+
+		std::shared_ptr<chain_t> GetAuthInitHandler() { return auth_init_handler; };
+		Crypto* GetCryptoEngine() { return &crypto; };
+		void SetSalt(std::unique_ptr<std::vector<byte>>&& salt) { crypto.SetSalt(std::move(salt)); };
+		AtomicMap<int,char>* GetAuthStateMap() { return &auth_state; };
+	private:
+
+		int RetrieveSalt();
+
+		int SendSalt();
+
+		Crypto crypto;
+		AtomicMap<int,char> auth_state;						// state of the connections
+		std::shared_ptr<chain_t> auth_init_handler;
+		AtomicQueue<std::shared_ptr<FrameObject>> salt_retrieved;
 	};
 
 	struct KeyExchangePacket;

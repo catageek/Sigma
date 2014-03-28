@@ -1,12 +1,13 @@
 #include <cstring>
 #include <thread>
 #include "systems/network/NetworkClient.h"
+#include "systems/network/NetworkSystem.h"
 #include "systems/network/Authentication.h"
 #include "systems/network/Protocol.h"
 
 namespace Sigma {
 	void NetworkClient::Start() {
-		Authentication::GetCryptoEngine()->InitializeDH();
+		NetworkSystem::GetAuthenticationComponent().GetCryptoEngine()->InitializeDH();
 	}
 
 	bool NetworkClient::Connect(const char *ip, unsigned short port) {

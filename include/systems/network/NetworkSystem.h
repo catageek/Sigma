@@ -7,6 +7,7 @@
 #include "systems/network/AtomicMap.hpp"
 #include "systems/network/ThreadPool.h"
 #include "systems/network/Protocol.h"
+#include "systems/network/Authentication.h"
 
 namespace network {
 	class TCPConnection;
@@ -32,6 +33,7 @@ namespace Sigma {
 	class NetworkSystem {
 	public:
 		friend class network_packet_handler::INetworkPacketHandler;
+		friend class Authentication;
 
 		DLL_EXPORT NetworkSystem();
 		DLL_EXPORT virtual ~NetworkSystem() {};
@@ -46,6 +48,7 @@ namespace Sigma {
 
 		static ThreadPool* GetThreadPool() { return &thread_pool; };
 
+		static Authentication& GetAuthenticationComponent() { return authentication; };
 		AtomicQueue<int>* GetDataRecvQueue() { return &data_received; };
 		AtomicQueue<std::shared_ptr<Frame_req>>* GetPublicRawFrameReqQueue() { return &pub_rawframe_req; };
 		AtomicQueue<std::shared_ptr<FrameObject>>* GetPublicReassembledFrameQueue() { return &pub_frame_req; };
@@ -68,6 +71,7 @@ namespace Sigma {
 
 		int ssocket;											// the listening socket
 		static IOPoller poller;
+		static Authentication authentication;
 
 		chain_t start;
 		chain_t unauthenticated_recv_data;
