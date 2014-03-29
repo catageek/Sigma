@@ -4,7 +4,6 @@
 #include "Sigma.h"
 #include "systems/network/IOPoller.h"
 #include "AtomicQueue.hpp"
-#include "systems/network/AtomicMap.hpp"
 #include "systems/network/ThreadPool.h"
 #include "systems/network/Protocol.h"
 #include "systems/network/AuthenticationHandler.h"
@@ -80,7 +79,6 @@ namespace Sigma {
 		chain_t authenticated_recv_data;
 
 		static ThreadPool thread_pool;
-		AtomicMap<int,char> auth_state;													// stateful connections, i.e packets are to be routed to a specific chain
 		AtomicQueue<std::shared_ptr<Frame_req>> auth_rawframe_req;		// raw frame request, authenticated
 		AtomicQueue<std::shared_ptr<FrameObject>> auth_frame_req;		// reassembled frame request, authenticated
 		AtomicQueue<std::shared_ptr<Frame_req>> pub_rawframe_req;		// raw frame requests

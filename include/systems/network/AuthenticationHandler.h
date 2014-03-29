@@ -3,7 +3,7 @@
 
 #include <cstdint>
 #include <memory>
-#include "systems/network/AtomicMap.hpp"
+#include "AtomicMap.hpp"
 #include "systems/network/ThreadPool.h"
 #include "systems/network/Crypto.h"
 #include "INetworkPacketHandler.h"
