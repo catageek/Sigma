@@ -109,7 +109,7 @@ namespace Sigma {
 					}
 					else if (evList[i].flags & EVFILT_READ) {
 						// Data received
-						if (! NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->Count(fd) || NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->At(fd) != AUTHENTICATED) {
+						if (! NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->Count(fd) || NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->At(fd) != AUTH_SHARE_KEY) {
 							// Data received, not authenticated
 							// Request the frame header
 							// We stop watching the connection until we got all the frame
@@ -119,8 +119,11 @@ namespace Sigma {
 							GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(unauthenticated_recv_data));
 						}
 						else {
+							// We stop watching the connection until we got all the frame
+							poller.Unwatch(fd);
 							// Data received from authenticated client
-							NetworkSystem::GetDataRecvQueue()->Push(fd);
+							NetworkSystem::GetAuthenticatedRawFrameReqQueue()->Push(std::make_shared<Frame_req>(fd));
+							GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(authenticated_recv_data));
 						}
 					}
 				}
@@ -170,6 +173,30 @@ namespace Sigma {
 							}
 							break;
 						}
+					default:
+						{
+							CloseConnection(req->fd);
+						}
+					}
+				}
+				return STOP;
+			}
+		});
+
+		authenticated_recv_data = chain_t({
+			// Get the length
+			std::bind(&NetworkSystem::ReassembleFrame, &auth_rawframe_req, &auth_frame_req, &thread_pool),
+			[&](){
+				auto req_list = NetworkSystem::GetAuthenticatedReassembledFrameQueue()->Poll();
+				if (! req_list) {
+					return STOP;
+				}
+				LOG_DEBUG << "got " << req_list->size() << " AuthenticatedDispatchReq events";
+				for (auto& req : *req_list) {
+					msg_hdr* header = req->Header();
+					auto major = header->type_major;
+					switch(major) {
+						// select handlers
 					default:
 						{
 							CloseConnection(req->fd);

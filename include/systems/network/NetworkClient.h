@@ -22,7 +22,7 @@ namespace Sigma {
 
 		std::unique_ptr<FrameObject> RecvMessage();
 
-		void WaitMessage();
+		void Authenticate();
 
 	private:
 		uint32_t auth_state;

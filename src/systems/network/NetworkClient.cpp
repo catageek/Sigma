@@ -25,8 +25,6 @@ namespace Sigma {
 			LOG_ERROR << "Could not connect to server !";
 			return false;
 		}
-		std::thread wait_msg(&NetworkClient::WaitMessage, this);
-		wait_msg.detach();
 
 		// TODO
 		char login[] = "my_login";
@@ -34,7 +32,11 @@ namespace Sigma {
 		std::strncpy(packet.Content<AuthInitPacket, char>(), login, LOGIN_FIELD_SIZE - 1);
 		SendMessage(NET_MSG, AUTH_INIT, packet);
 		auth_state = AUTH_INIT;
-		return true;
+
+		std::thread wait_msg(&NetworkClient::Authenticate, this);
+		wait_msg.join();
+
+		return (auth_state == AUTH_SHARE_KEY);
 	}
 
 	inline void NetworkClient::SendMessage(unsigned char major, unsigned char minor, FrameObject& packet) {
@@ -63,8 +65,8 @@ namespace Sigma {
 		return std::move(frame);
 	}
 
-	void NetworkClient::WaitMessage() {
-		while(1) {
+	void NetworkClient::Authenticate() {
+		while(auth_state != AUTH_SHARE_KEY) {
 			LOG_DEBUG << "Waiting message...";
 			auto m = std::move(RecvMessage());
 			if(m) {

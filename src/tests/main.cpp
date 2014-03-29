@@ -105,7 +105,9 @@ int main(int argCount, char **argValues) {
 	/////////////////////////////
 
 	netclient.Start();
-	netclient.Connect("127.0.0.1", 7777);
+	if(! netclient.Connect("127.0.0.1", 7777)) {
+		LOG_ERROR << "Could not authenticate on server.";
+	};
 
 	// Create hard coded entity ID #1
 	// position is hardcoded

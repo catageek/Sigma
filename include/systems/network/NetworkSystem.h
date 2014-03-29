@@ -49,7 +49,9 @@ namespace Sigma {
 		static ThreadPool* GetThreadPool() { return &thread_pool; };
 
 		static Authentication& GetAuthenticationComponent() { return authentication; };
-		AtomicQueue<int>* GetDataRecvQueue() { return &data_received; };
+
+		AtomicQueue<std::shared_ptr<Frame_req>>* GetAuthenticatedRawFrameReqQueue() { return &auth_rawframe_req; };
+		AtomicQueue<std::shared_ptr<FrameObject>>* GetAuthenticatedReassembledFrameQueue() { return &auth_frame_req; };
 		AtomicQueue<std::shared_ptr<Frame_req>>* GetPublicRawFrameReqQueue() { return &pub_rawframe_req; };
 		AtomicQueue<std::shared_ptr<FrameObject>>* GetPublicReassembledFrameQueue() { return &pub_frame_req; };
 
@@ -75,12 +77,14 @@ namespace Sigma {
 
 		chain_t start;
 		chain_t unauthenticated_recv_data;
+		chain_t authenticated_recv_data;
 
 		static ThreadPool thread_pool;
 		AtomicMap<int,char> auth_state;													// stateful connections, i.e packets are to be routed to a specific chain
-		AtomicQueue<int> data_received;			// Data received, authenticated
+		AtomicQueue<std::shared_ptr<Frame_req>> auth_rawframe_req;		// raw frame request, authenticated
+		AtomicQueue<std::shared_ptr<FrameObject>> auth_frame_req;		// reassembled frame request, authenticated
 		AtomicQueue<std::shared_ptr<Frame_req>> pub_rawframe_req;		// raw frame requests
-		AtomicQueue<std::shared_ptr<FrameObject>> pub_frame_req;			// reassembled frame request
+		AtomicQueue<std::shared_ptr<FrameObject>> pub_frame_req;		// reassembled frame request
 	};
 }
 
