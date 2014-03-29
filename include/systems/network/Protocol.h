@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include "INetworkPacketHandler.h"
+#include "systems/network/NetworkClient.h"
 
 // We are little endian !!!
 
@@ -45,10 +47,14 @@ namespace Sigma {
 
 	class FrameObject {
 	public:
+		friend class Authentication;
+		template<int Major,int Minor> friend int network_packet_handler::INetworkPacketHandler::Process();
+		friend void NetworkClient::SendMessage(unsigned char, unsigned char, FrameObject&);
+
 		template<class T=Frame_hdr>
 		FrameObject(int fd = -1) : fd(fd), packet_size(sizeof(T)), data(std::vector<char>(sizeof(T))) {};
 
-		void SendMessage(int fd, unsigned char major, unsigned char minor);
+		void SendMessage(id_t id, unsigned char major, unsigned char minor);
 
 		void Resize(size_t new_size) {
 			packet_size = new_size + sizeof(Frame);
@@ -71,6 +77,7 @@ namespace Sigma {
 		int fd;
 	private:
 		char* Body() { return ( data.size() ? data.data() + sizeof(msg_hdr) + sizeof(Frame_hdr) : nullptr); };
+		void SendMessage(int fd, unsigned char major, unsigned char minor);
 
 		std::vector<char> data;
 		uint32_t packet_size;

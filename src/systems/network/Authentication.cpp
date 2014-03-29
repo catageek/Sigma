@@ -2,6 +2,7 @@
 #include "systems/network/NetworkSystem.h"
 #include <cstring>
 #include "composites/VMAC_Checker.h"
+#include "composites/NetworkNode.h"
 #include "crypto++/vmac.h"
 
 namespace Sigma {
@@ -117,6 +118,8 @@ namespace Sigma {
 					LOG_DEBUG << "VMAC check passed";
 					reply_packet->SendMessage(req->fd, NET_MSG, AUTH_KEY_REPLY);
 					NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->At(req->fd) = AUTH_SHARE_KEY;
+					// TODO: Hardcoded entity
+					NetworkNode::AddEntity(1, network::TCPConnection(req->fd, network::NETA_IPv4, network::SCS_CONNECTED));
 					continue;
 				}
 				else {
