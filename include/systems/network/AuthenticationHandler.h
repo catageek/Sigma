@@ -4,9 +4,8 @@
 #include <cstdint>
 #include <memory>
 #include "AtomicMap.hpp"
-#include "systems/network/ThreadPool.h"
+#include "ThreadPool.h"
 #include "systems/network/Crypto.h"
-#include "INetworkPacketHandler.h"
 #include "systems/network/Protocol.h"
 
 #define LOGIN_FIELD_SIZE	16

@@ -4,7 +4,7 @@
 #include "Sigma.h"
 #include "systems/network/IOPoller.h"
 #include "AtomicQueue.hpp"
-#include "systems/network/ThreadPool.h"
+#include "ThreadPool.h"
 #include "systems/network/Protocol.h"
 #include "systems/network/AuthenticationHandler.h"
 
