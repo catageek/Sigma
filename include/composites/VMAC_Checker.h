@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include "Sigma.h"
 #include "systems/network/VMAC_StreamHasher.h"
-#include "systems/network/Authentication.h"
+#include "systems/network/AuthenticationHandler.h"
 
 namespace Sigma {
 	class VMAC_Checker {

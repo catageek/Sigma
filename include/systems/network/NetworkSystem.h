@@ -7,7 +7,7 @@
 #include "systems/network/AtomicMap.hpp"
 #include "systems/network/ThreadPool.h"
 #include "systems/network/Protocol.h"
-#include "systems/network/Authentication.h"
+#include "systems/network/AuthenticationHandler.h"
 
 namespace network {
 	class TCPConnection;

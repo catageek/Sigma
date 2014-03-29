@@ -2,7 +2,7 @@
 #include <thread>
 #include "systems/network/NetworkClient.h"
 #include "systems/network/NetworkSystem.h"
-#include "systems/network/Authentication.h"
+#include "systems/network/AuthenticationHandler.h"
 #include "systems/network/Protocol.h"
 
 namespace Sigma {

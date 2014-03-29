@@ -5,9 +5,6 @@
 #include <cstring>
 #include <sys/event.h>
 #include "netport/include/net/network.h"
-#include "systems/network/Protocol.h"
-#include "systems/network/ThreadPool.h"
-#include "systems/network/Authentication.h"
 #include <typeinfo>
 
 using namespace network;

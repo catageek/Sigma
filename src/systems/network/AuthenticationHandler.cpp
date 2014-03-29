@@ -1,4 +1,4 @@
-#include "systems/network/Authentication.h"
+#include "systems/network/AuthenticationHandler.h"
 #include "systems/network/NetworkSystem.h"
 #include <cstring>
 #include "composites/VMAC_Checker.h"
