@@ -3,7 +3,7 @@
 
 #include "Sigma.h"
 #include "systems/network/IOPoller.h"
-#include "systems/network/AtomicQueue.hpp"
+#include "AtomicQueue.hpp"
 #include "systems/network/AtomicMap.hpp"
 #include "systems/network/ThreadPool.h"
 #include "systems/network/Protocol.h"

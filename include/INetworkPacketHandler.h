@@ -1,7 +1,7 @@
 #ifndef INETWORKPACKETHANDLER_H_INCLUDED
 #define INETWORKPACKETHANDLER_H_INCLUDED
 
-#include "systems/network/AtomicQueue.hpp"
+#include "AtomicQueue.hpp"
 #include "Log.h"
 
 namespace Sigma {
