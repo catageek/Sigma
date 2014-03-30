@@ -1,5 +1,5 @@
-#ifndef INETWORKPACKETHANDLER_H_INCLUDED
-#define INETWORKPACKETHANDLER_H_INCLUDED
+#ifndef NETWORKPACKETHANDLER_HPP_INCLUDED
+#define NETWORKPACKETHANDLER_HPP_INCLUDED
 
 #include "AtomicQueue.hpp"
 #include "Log.h"
@@ -33,4 +33,4 @@ namespace Sigma {
 	} // namespace network_packet_handler
 } // namespace Sigma
 
-#endif // INETWORKPACKETHANDLER_H_INCLUDED
+#endif // NETWORKPACKETHANDLER_HPP_INCLUDED

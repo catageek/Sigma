@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
-#include "INetworkPacketHandler.h"
+#include "systems/network/NetworkPacketHandler.hpp"
 #include "systems/network/NetworkClient.h"
 
 #define VMAC_SIZE			8

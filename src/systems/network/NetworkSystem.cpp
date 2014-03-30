@@ -244,9 +244,6 @@ namespace Sigma {
 
 	int NetworkSystem::ReassembleFrame(AtomicQueue<std::shared_ptr<Frame_req>>* input, AtomicQueue<std::shared_ptr<FrameObject>>* output, ThreadPool* thread_pool) {
 		auto req_list = input->Poll();
-		if (!req_list) {
-			return STOP;
-		}
 		LOG_DEBUG << "got " << req_list->size() << " Reassemble frame requests";
 		for (auto& req : *req_list) {
 			auto target_size = req->length_requested;
@@ -277,6 +274,9 @@ namespace Sigma {
 				poller.Watch(frame->fd);
 				output->Push(frame);
 			}
+		}
+		if(input->Empty()) {
+			return CONTINUE;
 		}
 		return SPLIT;
 	}

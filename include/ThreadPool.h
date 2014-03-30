@@ -128,13 +128,13 @@ namespace Sigma {
 		template<class U>
 		void Queue(U&& task, identity<chain_t>) {
 			std::unique_lock<std::mutex> locker(m_queue);
-			for (auto t : taskqueue) {
+/*			for (auto t : taskqueue) {
 				if (t == task) {
 					// No duplicate entry
 					return;
 				}
 			}
-			taskqueue.push_back(std::forward<U>(task));
+*/			taskqueue.push_back(std::forward<U>(task));
 			queuecheck.notify_one();
 		}
 

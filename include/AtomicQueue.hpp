@@ -32,6 +32,16 @@ namespace Sigma {
 			mtx.unlock();
 		}
 
+		bool Pop(T& element) {
+			std::unique_lock<std::mutex> locker(mtx);
+			if(q->empty()) {
+				return false;
+			}
+			element = std::move(q->front());
+			q->pop_front();
+			return true;
+		}
+
 		bool Empty() const {
 			return q->empty();
 		}

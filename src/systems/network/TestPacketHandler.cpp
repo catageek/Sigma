@@ -1,6 +1,6 @@
 #include "systems/network/TestPacketHandler.h"
 
-#include "INetworkPacketHandler.h"
+#include "systems/network/NetworkPacketHandler.hpp"
 #include "systems/network/Protocol.h"
 #include "composites/NetworkNode.h"
 
