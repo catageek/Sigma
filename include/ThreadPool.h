@@ -94,6 +94,7 @@ namespace Sigma {
 
 	private:
 		static std::function<void(std::shared_ptr<TaskReq<chain_t>>)> queue_task;
+		static std::function<void(std::shared_ptr<TaskReq<chain_t>>)> execute_task;
 		std::shared_ptr<chain_t> chain;
 		chain_t::const_iterator block;
 		chain_t::const_iterator block_end;
@@ -105,6 +106,11 @@ namespace Sigma {
 		virtual ~ThreadPool() {};
 
 		void Initialize();
+
+		template<class T>
+		void Execute(const std::shared_ptr<TaskReq<T>>& task) {
+			task->RunTask();
+		}
 
 		template<class T>
 		void Queue(std::shared_ptr<TaskReq<T>>& task) {

@@ -77,8 +77,8 @@ namespace Sigma {
 			// Poll the socket and select the next chain to run
 			[&](){
 				std::vector<struct kevent> evList(32);
-				auto nev = poller.Poll(evList, nullptr);
-				if (nev < 1) {
+				auto nev = poller.Poll(evList);
+				if (nev < 0) {
 					LOG_ERROR << "Error when polling event";
 				}
 				LOG_DEBUG << "got " << nev << " kqueue events";
@@ -100,6 +100,7 @@ namespace Sigma {
 							LOG_ERROR << "Could not accept connection, handle is " << ssocket;
 							continue;
 						}
+						c.SetNonBlocking(true);
 						poller.Watch(c.Handle());
 						LOG_DEBUG << "connect " << c.Handle();
 //						c.Send("welcome!\n");
@@ -127,6 +128,7 @@ namespace Sigma {
 					}
 				}
 				// Queue a task to wait another event
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
 				return REPEAT;
 			}
 		});
@@ -162,7 +164,7 @@ namespace Sigma {
 								case AUTH_KEY_EXCHANGE:
 									{
 										network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_KEY_EXCHANGE>()->Push(req);
-										GetThreadPool()->Queue(std::make_shared<TaskReq<block_t>>(block_t(&network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE>)));
+										network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE>();
 										break;
 									}
 								default:
@@ -188,18 +190,15 @@ namespace Sigma {
 			// Get the length
 			std::bind(&NetworkSystem::ReassembleFrame, &auth_rawframe_req, &auth_frame_req, &thread_pool),
 			[&](){
-				auto req_list = NetworkSystem::GetAuthenticatedReassembledFrameQueue()->Poll();
-				if (! req_list) {
+				std::shared_ptr<FrameObject> req;
+				if(! NetworkSystem::GetAuthenticatedReassembledFrameQueue()->Pop(req)) {
 					return STOP;
 				}
-				LOG_DEBUG << "got " << req_list->size() << " AuthenticatedDispatchReq events";
-				for (auto& req : *req_list) {
-					if(req->Verify_VMAC_tag(NetworkNode::getEntityID(req->fd))) {
-						NetworkSystem::GetAuthenticatedCheckedFrameQueue()->Push(req);
-					}
-					else {
-						LOG_DEBUG << "Dropping 1 frame (VMAC check failed)";
-					}
+				if(req->Verify_VMAC_tag(NetworkNode::getEntityID(req->fd))) {
+					NetworkSystem::GetAuthenticatedCheckedFrameQueue()->Push(req);
+				}
+				else {
+					LOG_DEBUG << "Dropping 1 frame (VMAC check failed)";
 				}
 				return CONTINUE;
 			},
@@ -243,41 +242,43 @@ namespace Sigma {
 	}
 
 	int NetworkSystem::ReassembleFrame(AtomicQueue<std::shared_ptr<Frame_req>>* input, AtomicQueue<std::shared_ptr<FrameObject>>* output, ThreadPool* thread_pool) {
-		auto req_list = input->Poll();
-		LOG_DEBUG << "got " << req_list->size() << " Reassemble frame requests";
-		for (auto& req : *req_list) {
-			auto target_size = req->length_requested;
-			auto frame = req->reassembled_frame;
-			char* buffer = reinterpret_cast<char*>(frame->FullFrame());
+		std::shared_ptr<Frame_req> req;
+		if(! input->Pop(req)) {
+			return STOP;
+		}
+		auto target_size = req->length_requested;
+		auto frame = req->reassembled_frame;
+		char* buffer = reinterpret_cast<char*>(frame->FullFrame());
 
-			auto current_size = req->length_got;
+		auto current_size = req->length_got;
 
+		auto len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
+		current_size += len;
+		req->length_got = current_size;
+
+		if(current_size == sizeof(Frame_hdr) && target_size == sizeof(Frame_hdr)) {
+			// We now have the length
+			auto length = frame->FullFrame()->length;
+			target_size = frame->FullFrame()->length + sizeof(Frame_hdr);
+			req->length_requested = target_size;
+			frame->Resize<false>(length - sizeof(msg_hdr));
+			buffer = reinterpret_cast<char*>(frame->FullFrame());
 			auto len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
 			current_size += len;
 			req->length_got = current_size;
-
-			if(current_size == sizeof(Frame_hdr) && target_size == sizeof(Frame_hdr)) {
-				// We now have the length
-				auto length = frame->FullFrame()->length;
-				target_size = frame->FullFrame()->length + sizeof(Frame_hdr);
-				req->length_requested = target_size;
-				frame->Resize<false>(length - sizeof(msg_hdr));
-				buffer = reinterpret_cast<char*>(frame->FullFrame());
-			}
-
-			if (current_size < target_size) {
-				// we put again the request in the queue
-				input->Push(req);
-			}
-			else {
-				LOG_DEBUG << "Packet of " << current_size << " put in dispatch queue.";
-				poller.Watch(frame->fd);
-				output->Push(frame);
-			}
 		}
-		if(input->Empty()) {
-			return CONTINUE;
+
+		if (current_size < target_size) {
+			// we put again the request in the queue
+			LOG_DEBUG << "got only " << current_size << " bytes, waiting " << target_size << " bytes";
+			input->Push(req);
+			return REPEAT;
 		}
-		return SPLIT;
+		else {
+			LOG_DEBUG << "Packet of " << current_size << " put in dispatch queue.";
+			poller.Watch(frame->fd);
+			output->Push(frame);
+		}
+		return CONTINUE;
 	}
 }

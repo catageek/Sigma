@@ -7,15 +7,14 @@
 namespace Sigma {
 	namespace network_packet_handler {
 		template<>
-		int INetworkPacketHandler::Process<TEST,TEST>() {
+		void INetworkPacketHandler::Process<TEST,TEST>() {
 			auto req_list = GetQueue<TEST,TEST>()->Poll();
 			if (!req_list) {
-				return STOP;
+				return;
 			}
 			for(auto& req : *req_list) {
 				LOG_DEBUG << "Received authenticated test message with content: " << std::string(req->Content<TestPacket>()->message, 8) << " from id #" << NetworkNode::getEntityID(req->fd);
 			}
-			return CONTINUE;
 		}
 	}
 

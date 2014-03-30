@@ -22,7 +22,7 @@ namespace Sigma {
 		class INetworkPacketHandler {
 		public:
 			template<int Major, int Minor>
-			static int Process() {
+			static void Process() {
 				LOG_DEBUG << "parent process here...";
 			};
 

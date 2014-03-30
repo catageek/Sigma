@@ -94,15 +94,15 @@ namespace Sigma {
 
 	namespace network_packet_handler {
 		template<>
-		int INetworkPacketHandler::Process<NET_MSG,AUTH_INIT>() {
-			NetworkSystem::GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(NetworkSystem::GetAuthenticationComponent().GetAuthInitHandler()));
+		void INetworkPacketHandler::Process<NET_MSG,AUTH_INIT>() {
+			NetworkSystem::GetThreadPool()->Execute(std::make_shared<TaskReq<chain_t>>(NetworkSystem::GetAuthenticationComponent().GetAuthInitHandler()));
 		}
 
 		template<>
-		int INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE>() {
+		void INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE>() {
 			auto req_list = GetQueue<NET_MSG,AUTH_KEY_EXCHANGE>()->Poll();
 			if (!req_list) {
-				return STOP;
+				return;
 			}
 			for(auto& req : *req_list) {
 				if(! NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->Count(req->fd) || NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->At(req->fd) != AUTH_KEY_EXCHANGE) {
@@ -124,7 +124,6 @@ namespace Sigma {
 					LOG_DEBUG << "VMAC check failed";
 				}
 			}
-			return CONTINUE;
 		}
 	}
 

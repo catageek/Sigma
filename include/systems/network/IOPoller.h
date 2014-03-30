@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdio>
 #include "sys/event.h"
+#include "sys/time.h"
 #include "Log.h"
 
 namespace Sigma {
@@ -22,10 +23,11 @@ namespace Sigma {
 
 		void Unwatch(int fd);
 
-		int Poll(std::vector<struct kevent>& v, const struct timespec *timeout = NULL);
+		int Poll(std::vector<struct kevent>& v);
 	private:
 		class IOEvent;			// An IO event
 		int kqhandle;			// the handle of the kqueue
+		const timespec ts{};	// for non-blocking kevent
 	};
 
 	// implementation of the functions are here for inline
@@ -56,8 +58,8 @@ namespace Sigma {
 		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
 	}
 
-	inline int IOPoller::Poll(std::vector<struct kevent>& v, const struct timespec *timeout) {
-		return kevent(kqhandle, NULL, 0, v.data(), v.size(), timeout);
+	inline int IOPoller::Poll(std::vector<struct kevent>& v) {
+		return kevent(kqhandle, NULL, 0, v.data(), v.size(), &ts);
 	}
 }
 

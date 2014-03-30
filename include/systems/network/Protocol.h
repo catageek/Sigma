@@ -54,7 +54,7 @@ namespace Sigma {
 	class FrameObject {
 	public:
 		friend class Authentication;
-		template<int Major,int Minor> friend int network_packet_handler::INetworkPacketHandler::Process();
+		template<int Major,int Minor> friend void network_packet_handler::INetworkPacketHandler::Process();
 		friend void NetworkClient::SendMessage(unsigned char, unsigned char, FrameObject&);
 		friend void NetworkClient::SendUnauthenticatedMessage(unsigned char, unsigned char, FrameObject&);
 
