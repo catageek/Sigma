@@ -13,7 +13,6 @@
 #define ALEA_SIZE			16
 #define NONCE2_SIZE			16
 #define	NONCE_SIZE			8
-#define VMAC_SIZE			8
 #define VMAC_MSG_SIZE		(ALEA_SIZE + NONCE2_SIZE + NONCE_SIZE)
 
 #define AUTH_NONE			0
@@ -89,7 +88,7 @@ namespace Sigma {
 			return ret;
 		}
 
-		bool VMAC_BuildHasher();
+		bool VMAC_BuildHasher(bool isClient = false);
 		bool VerifyVMAC();
 	};
 

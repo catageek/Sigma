@@ -19,6 +19,7 @@ namespace Sigma {
 		bool Connect(const char *ip, unsigned short port);
 
 		void SendMessage(unsigned char major, unsigned char minor, FrameObject& packet);
+		void SendUnauthenticatedMessage(unsigned char major, unsigned char minor, FrameObject& packet);
 
 		std::unique_ptr<FrameObject> RecvMessage();
 

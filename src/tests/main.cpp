@@ -13,7 +13,9 @@
 #include "systems/WebGUISystem.h"
 #include "OS.h"
 #include "components/SpotLight.h"
+#include "systems/network/Protocol.h"
 #include "systems/network/NetworkClient.h"
+#include "systems/network/TestPacketHandler.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -108,6 +110,10 @@ int main(int argCount, char **argValues) {
 	if(! netclient.Connect("127.0.0.1", 7777)) {
 		LOG_ERROR << "Could not authenticate on server.";
 	};
+
+	Sigma::FrameObject packet{};
+	std::strcpy(packet.Content<Sigma::TestPacket>()->message, std::string("trillek").c_str());
+	netclient.SendMessage(TEST, TEST, packet);
 
 	// Create hard coded entity ID #1
 	// position is hardcoded

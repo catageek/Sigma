@@ -27,7 +27,7 @@ namespace Sigma {
             return false;
 		};
 
-		static bool Digest(id_t id, byte* digest, const byte* message, int len) {
+		static bool Digest(id_t id, byte* digest, const byte* message, uint32_t len) {
             auto hasher = hasher_map.find(id);
             if (hasher != hasher_map.end()) {
 				hasher->second.CalculateDigest(digest, message, len);

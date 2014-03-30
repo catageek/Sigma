@@ -28,9 +28,9 @@ namespace Sigma {
 
 		// TODO
 		char login[] = "my_login";
-		auto packet = FrameObject();
+		FrameObject packet{};
 		std::strncpy(packet.Content<AuthInitPacket, char>(), login, LOGIN_FIELD_SIZE - 1);
-		SendMessage(NET_MSG, AUTH_INIT, packet);
+		SendUnauthenticatedMessage(NET_MSG, AUTH_INIT, packet);
 		auth_state = AUTH_INIT;
 
 		std::thread wait_msg(&NetworkClient::Authenticate, this);
@@ -39,7 +39,12 @@ namespace Sigma {
 		return (auth_state == AUTH_SHARE_KEY);
 	}
 
-	inline void NetworkClient::SendMessage(unsigned char major, unsigned char minor, FrameObject& packet) {
+	void NetworkClient::SendMessage(unsigned char major, unsigned char minor, FrameObject& packet) {
+		packet.Set_VMAC_Flag();
+		packet.SendMessage(cnx.Handle(), major, minor);
+	}
+
+	inline void NetworkClient::SendUnauthenticatedMessage(unsigned char major, unsigned char minor, FrameObject& packet) {
 		packet.SendMessage(cnx.Handle(), major, minor);
 	}
 
@@ -55,7 +60,7 @@ namespace Sigma {
 			LOG_ERROR << "Connection error : received " << len << " bytes as length instead of " << sizeof(uint32_t);
 			return std::unique_ptr<FrameObject>();
 		}
-		frame->Resize(length - sizeof(msg_hdr));
+		frame->Resize<false>(length - sizeof(msg_hdr));
 		auto header = frame->Header();
 		len = cnx.Recv(reinterpret_cast<char*>(header), length);
 		if (len < length) {
@@ -86,8 +91,8 @@ namespace Sigma {
 //								Authentication::SetSalt(std::unique_ptr<std::vector<unsigned char>>(m->body.get()));
 								auto frame = body->GetKeyExchangePacket();
 								auto packet = frame->Content<KeyExchangePacket>();
-								packet->VMAC_BuildHasher();
-								SendMessage(NET_MSG, AUTH_KEY_EXCHANGE, *frame);
+								packet->VMAC_BuildHasher(true);
+								SendUnauthenticatedMessage(NET_MSG, AUTH_KEY_EXCHANGE, *frame);
 								LOG_DEBUG << "Sending keys : " << frame->PacketSize() << " bytes";
 								auth_state = AUTH_KEY_EXCHANGE;
 								break;

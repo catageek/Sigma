@@ -6,6 +6,7 @@
 #include <sys/event.h>
 #include "netport/include/net/network.h"
 #include <typeinfo>
+#include "composites/NetworkNode.h"
 
 using namespace network;
 
@@ -111,12 +112,13 @@ namespace Sigma {
 							// Request the frame header
 							// We stop watching the connection until we got all the frame
 							poller.Unwatch(fd);
-							// queue the task to reassemble the the frame
+							// queue the task to reassemble the frame
 							NetworkSystem::GetPublicRawFrameReqQueue()->Push(std::make_shared<Frame_req>(fd));
 							GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(unauthenticated_recv_data));
 						}
 						else {
 							// We stop watching the connection until we got all the frame
+							LOG_DEBUG << "got authenticated frame";
 							poller.Unwatch(fd);
 							// Data received from authenticated client
 							NetworkSystem::GetAuthenticatedRawFrameReqQueue()->Push(std::make_shared<Frame_req>(fd));
@@ -165,6 +167,7 @@ namespace Sigma {
 									}
 								default:
 									{
+										LOG_DEBUG << "invalid minor code, closing";
 										CloseConnection(req->fd);
 									}
 							}
@@ -172,6 +175,7 @@ namespace Sigma {
 						}
 					default:
 						{
+							LOG_DEBUG << "invalid major code, closing";
 							CloseConnection(req->fd);
 						}
 					}
@@ -190,10 +194,43 @@ namespace Sigma {
 				}
 				LOG_DEBUG << "got " << req_list->size() << " AuthenticatedDispatchReq events";
 				for (auto& req : *req_list) {
+					if(req->Verify_VMAC_tag(NetworkNode::getEntityID(req->fd))) {
+						NetworkSystem::GetAuthenticatedCheckedFrameQueue()->Push(req);
+					}
+					else {
+						LOG_DEBUG << "Dropping 1 frame (VMAC check failed)";
+					}
+				}
+				return CONTINUE;
+			},
+			[&](){
+				auto req_list = NetworkSystem::GetAuthenticatedCheckedFrameQueue()->Poll();
+				if (! req_list) {
+					return STOP;
+				}
+				LOG_DEBUG << "got " << req_list->size() << " AuthenticatedCheckedDispatchReq events";
+				for (auto& req : *req_list) {
 					msg_hdr* header = req->Header();
 					auto major = header->type_major;
 					switch(major) {
 						// select handlers
+					case TEST:
+						{
+							auto minor = header->type_minor;
+							switch(minor) {
+								case TEST:
+									{
+										network_packet_handler::INetworkPacketHandler::GetQueue<TEST,TEST>()->Push(req);
+										network_packet_handler::INetworkPacketHandler::Process<TEST,TEST>();
+										break;
+									}
+								default:
+									{
+										CloseConnection(req->fd);
+									}
+							}
+						}
+
 					default:
 						{
 							CloseConnection(req->fd);
@@ -227,7 +264,7 @@ namespace Sigma {
 				auto length = frame->FullFrame()->length;
 				target_size = frame->FullFrame()->length + sizeof(Frame_hdr);
 				req->length_requested = target_size;
-				frame->Resize(length);
+				frame->Resize<false>(length - sizeof(msg_hdr));
 				buffer = reinterpret_cast<char*>(frame->FullFrame());
 			}
 
@@ -237,6 +274,7 @@ namespace Sigma {
 			}
 			else {
 				LOG_DEBUG << "Packet of " << current_size << " put in dispatch queue.";
+				poller.Watch(frame->fd);
 				output->Push(frame);
 			}
 		}

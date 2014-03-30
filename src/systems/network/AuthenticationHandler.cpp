@@ -37,8 +37,6 @@ namespace Sigma {
 				// send salt
 				req->SendMessage(req->fd, 1, 2);
 				Authentication::GetAuthStateMap()->At(req->fd) = AUTH_KEY_EXCHANGE;
-				// Wait reply
-				NetworkSystem::Poller()->Watch(req->fd);
 			}
 			else {
 				// close connection
@@ -71,7 +69,7 @@ namespace Sigma {
 		return NetworkSystem::GetAuthenticationComponent().GetCryptoEngine()->VMAC_Verify(vmac, reinterpret_cast<const byte*>(this), VMAC_MSG_SIZE, key, nonce);
 	}
 
-	bool KeyExchangePacket::VMAC_BuildHasher() {
+	bool KeyExchangePacket::VMAC_BuildHasher(bool isClient) {
 		// TODO : hard coded key of the player
 		byte key[] = "very_secret_key";
 		// The variable that will hold the hasher key for this session
@@ -131,6 +129,7 @@ namespace Sigma {
 	}
 
 	namespace reflection {
+		template <> inline const char* GetNetworkHandler<NET_MSG,AUTH_INIT>(void) { return "AuthenticationHandler"; }
 		template <> inline const char* GetNetworkHandler<NET_MSG,AUTH_KEY_EXCHANGE>(void) { return "AuthenticationHandler"; }
 	}
 }
