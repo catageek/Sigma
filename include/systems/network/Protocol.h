@@ -6,6 +6,7 @@
 #include <vector>
 #include "systems/network/NetworkPacketHandler.hpp"
 #include "systems/network/NetworkClient.h"
+#include "composites/VMAC_Checker.h"
 
 #define VMAC_SIZE			8
 
@@ -59,7 +60,8 @@ namespace Sigma {
 		friend void NetworkClient::SendUnauthenticatedMessage(unsigned char, unsigned char, FrameObject&);
 
 		template<class T=Frame_hdr>
-		FrameObject(int fd = -1) : fd(fd), packet_size(sizeof(T)), data(std::vector<char>(sizeof(T) + VMAC_SIZE)) {};
+		FrameObject(int fd = -1, vmac_pair* vmac_ptr = nullptr) : fd(fd), packet_size(sizeof(T)), data(std::vector<char>(sizeof(T) + VMAC_SIZE)),
+																	vmac_verifier(vmac_ptr) {};
 
 		// Copy constructor and assignment are deleted to remain zero-copy
 		FrameObject(FrameObject&) = delete;
@@ -76,7 +78,7 @@ namespace Sigma {
 
 		void Set_VMAC_Flag();
 
-		bool Verify_VMAC_tag(const id_t id);
+		bool Verify_VMAC_tag();
 
 		template<class T, class U=T>
 		U* Content() {
@@ -87,6 +89,8 @@ namespace Sigma {
 		}
 
 		uint32_t PacketSize() const { return packet_size; };
+
+		id_t GetId() const;
 
 		msg_hdr* Header() { return reinterpret_cast<msg_hdr*>(data.data() + sizeof(Frame_hdr)); };
 		Frame_hdr* FullFrame() { return reinterpret_cast<Frame_hdr*>(data.data()); };
@@ -100,6 +104,7 @@ namespace Sigma {
 
 		std::vector<char> data;
 		uint32_t packet_size;
+		vmac_pair* const vmac_verifier;
 	};
 }
 

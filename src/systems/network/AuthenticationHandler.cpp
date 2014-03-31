@@ -69,7 +69,7 @@ namespace Sigma {
 		return NetworkSystem::GetAuthenticationComponent().GetCryptoEngine()->VMAC_Verify(vmac, reinterpret_cast<const byte*>(this), VMAC_MSG_SIZE, key, nonce);
 	}
 
-	bool KeyExchangePacket::VMAC_BuildHasher(bool isClient) {
+	bool KeyExchangePacket::VMAC_BuildHasher(int fd) {
 		// TODO : hard coded key of the player
 		byte key[] = "very_secret_key";
 		// The variable that will hold the hasher key for this session
@@ -77,18 +77,28 @@ namespace Sigma {
 		// We derive the player key using the alea given by the player
 		NetworkSystem::GetAuthenticationComponent().GetCryptoEngine()->VMAC128(checker_key->data(), alea, ALEA_SIZE, key, nonce2);
 		// We store the key in the component
-		// TODO : entity ID is hardcoded
 		LOG_DEBUG << "Inserting checker";
-		VMAC_Checker::AddEntity(1, std::move(checker_key), nonce2, 8);
+		if (fd <0) {
+			// client hasher is stored under id #1
+			VMAC_Checker::AddEntity(1, std::move(checker_key), nonce2, 8);
+		}
+		else {
+			// server
+			// TODO : entity ID is hardcoded
+			auto hasher = VMAC_Checker::AddEntity(1, std::move(checker_key), nonce2, 8);
+			NetworkSystem::Poller()->Create(fd, reinterpret_cast<void*>(hasher));
+		}
 		return true;
 	}
 
 	bool KeyReplyPacket::Compute(const byte* m) {
 		std::memcpy(challenge, m, NONCE2_SIZE);
+		// TODO : entity ID is hardcoded
 		return VMAC_Checker::Digest(1, vmac, challenge, NONCE2_SIZE);
 	}
 
 	bool KeyReplyPacket::VerifyVMAC() {
+		// TODO : entity ID is hardcoded
 		return VMAC_Checker::Verify(1, vmac, challenge, NONCE2_SIZE);
 	}
 
@@ -111,7 +121,7 @@ namespace Sigma {
 					NetworkSystem::CloseConnection(req->fd);
 					continue;
 				}
-				auto reply_packet = req->Content<KeyExchangePacket>()->ComputeSessionKey();
+				auto reply_packet = req->Content<KeyExchangePacket>()->ComputeSessionKey(req->fd);
 				if(reply_packet) {
 					LOG_DEBUG << "VMAC check passed";
 					reply_packet->SendMessage(req->fd, NET_MSG, AUTH_KEY_REPLY);

@@ -2,7 +2,6 @@
 #include "Sigma.h"
 #include "netport/include/net/network.h"
 #include "composites/NetworkNode.h"
-#include "composites/VMAC_Checker.h"
 
 using namespace network;
 
@@ -18,7 +17,7 @@ namespace Sigma {
 
 		if(Header()->flags & (1 << HAS_VMAC_TAG)) {
 			FullFrame()->length = packet_size - sizeof(Frame_hdr) + VMAC_SIZE;
-			// The VMAC Hasher has been put under id #1
+			// The VMAC Hasher has been put under id #1 for client
 			VMAC_Checker::Digest(1, VMAC_tag(), reinterpret_cast<const unsigned char*>(data.data()), packet_size);
 			LOG_DEBUG << "Bytes to send (with VMAC): " << packet_size + VMAC_SIZE;
 			if (TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Send(reinterpret_cast<char*>(FullFrame()), packet_size + VMAC_SIZE) <= 0) {
@@ -49,11 +48,14 @@ namespace Sigma {
 		Header()->flags |= 1 << HAS_VMAC_TAG;
 	}
 
-	bool FrameObject::Verify_VMAC_tag(const id_t id) {
+	bool FrameObject::Verify_VMAC_tag() {
 		if(Header()->flags & (1 << HAS_VMAC_TAG)) {
 			packet_size -= VMAC_SIZE;
-			return VMAC_Checker::Verify(id, VMAC_tag(), reinterpret_cast<const unsigned char*>(data.data()), packet_size);
+			return vmac_verifier->second.Verify(VMAC_tag(), reinterpret_cast<const unsigned char*>(data.data()), packet_size);
 		}
 		return false;
 	}
+
+	id_t FrameObject::GetId() const { return vmac_verifier->first; }
+
 }

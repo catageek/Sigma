@@ -38,7 +38,7 @@ namespace Sigma {
 		//std::thread t(&IOWorker::watch_start, &this->worker, std::move(s));
 		//t.detach();
 		ssocket = s->Handle();
-		poller.Watch(ssocket);
+		poller.CreatePermanent(ssocket);
 		auto tr = std::make_shared<TaskReq<chain_t>>(start);
 		GetThreadPool()->Queue(tr);
 		return true;
@@ -67,7 +67,7 @@ namespace Sigma {
 	}
 
 	void NetworkSystem::CloseConnection(int fd) {
-		poller.Unwatch(fd);
+		poller.Delete(fd);
 		TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Close();
 		NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->Erase(fd);
 	}
@@ -101,7 +101,7 @@ namespace Sigma {
 							continue;
 						}
 						c.SetNonBlocking(true);
-						poller.Watch(c.Handle());
+						poller.Create(c.Handle());
 						LOG_DEBUG << "connect " << c.Handle();
 //						c.Send("welcome!\n");
 						NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->Insert(c.Handle(), AUTH_INIT);
@@ -111,8 +111,6 @@ namespace Sigma {
 						if (! NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->Count(fd) || NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->At(fd) != AUTH_SHARE_KEY) {
 							// Data received, not authenticated
 							// Request the frame header
-							// We stop watching the connection until we got all the frame
-							poller.Unwatch(fd);
 							// queue the task to reassemble the frame
 							NetworkSystem::GetPublicRawFrameReqQueue()->Push(std::make_shared<Frame_req>(fd));
 							GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(unauthenticated_recv_data));
@@ -120,9 +118,8 @@ namespace Sigma {
 						else {
 							// We stop watching the connection until we got all the frame
 							LOG_DEBUG << "got authenticated frame";
-							poller.Unwatch(fd);
 							// Data received from authenticated client
-							NetworkSystem::GetAuthenticatedRawFrameReqQueue()->Push(std::make_shared<Frame_req>(fd));
+							NetworkSystem::GetAuthenticatedRawFrameReqQueue()->Push(std::make_shared<Frame_req>(fd, reinterpret_cast<vmac_pair*>(evList[i].udata)));
 							GetThreadPool()->Queue(std::make_shared<TaskReq<chain_t>>(authenticated_recv_data));
 						}
 					}
@@ -194,7 +191,7 @@ namespace Sigma {
 				if(! NetworkSystem::GetAuthenticatedReassembledFrameQueue()->Pop(req)) {
 					return STOP;
 				}
-				if(req->Verify_VMAC_tag(NetworkNode::getEntityID(req->fd))) {
+				if(req->Verify_VMAC_tag()) {
 					NetworkSystem::GetAuthenticatedCheckedFrameQueue()->Push(req);
 				}
 				else {

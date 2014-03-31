@@ -13,7 +13,7 @@ namespace Sigma {
 				return;
 			}
 			for(auto& req : *req_list) {
-				LOG_DEBUG << "Received authenticated test message with content: " << std::string(req->Content<TestPacket>()->message, 8) << " from id #" << NetworkNode::getEntityID(req->fd);
+				LOG_DEBUG << "Received authenticated test message with content: " << std::string(req->Content<TestPacket>()->message, 8) << " from id #" << req->GetId();
 			}
 		}
 	}

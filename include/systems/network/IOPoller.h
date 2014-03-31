@@ -19,9 +19,15 @@ namespace Sigma {
 			return kqhandle != -1;
 		}
 
+		void Create(int fd, void* udata = NULL);
+
+		void CreatePermanent(int fd);
+
 		void Watch(int fd);
 
 		void Unwatch(int fd);
+
+		void Delete(int fd);
 
 		int Poll(std::vector<struct kevent>& v);
 	private:
@@ -34,7 +40,7 @@ namespace Sigma {
 
 	class IOPoller::IOEvent {
 	public:
-		IOEvent(int fd, int filter, int operation) { EV_SET(&ke, fd, filter, operation, 0, 5, NULL); };
+		IOEvent(int fd, int filter, int operation, void* udata = NULL) { EV_SET(&ke, fd, filter, operation, 0, 5, udata); };
 		virtual ~IOEvent() {};
 
 		const struct kevent* getStruct() { return &ke; };
@@ -43,8 +49,16 @@ namespace Sigma {
 		struct kevent ke;
 	};
 
+	inline void IOPoller::Create(int fd, void* udata) {
+		IOEvent e(fd, EVFILT_READ, EV_ADD|EV_DISPATCH, udata);
+		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
+		if (i == -1) {
+			perror ("The following error occurred in Watch(): ");
+			return;
+		}
+	}
 
-	inline void IOPoller::Watch(int fd) {
+	inline void IOPoller::CreatePermanent(int fd) {
 		IOEvent e(fd, EVFILT_READ, EV_ADD);
 		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
 		if (i == -1) {
@@ -53,7 +67,21 @@ namespace Sigma {
 		}
 	}
 
+	inline void IOPoller::Watch(int fd) {
+		IOEvent e(fd, EVFILT_READ, EV_ENABLE);
+		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
+		if (i == -1) {
+			perror ("The following error occurred in Watch(): ");
+			return;
+		}
+	}
+
 	inline void IOPoller::Unwatch(int fd) {
+		IOEvent e(fd, EVFILT_READ, EV_DISABLE);
+		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
+	}
+
+	inline void IOPoller::Delete(int fd) {
 		IOEvent e(fd, EVFILT_READ, EV_DELETE);
 		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
 	}

@@ -74,11 +74,11 @@ namespace Sigma {
 		byte nonce[NONCE_SIZE];								// a random number used as nonce for the VMAC of this packet
 		byte vmac[VMAC_SIZE];								// VMAC of the message using nonce and shared secret
 
-		std::shared_ptr<FrameObject> ComputeSessionKey() {
+		std::shared_ptr<FrameObject> ComputeSessionKey(int fd) {
 			if(! VerifyVMAC()) {
 				return std::shared_ptr<FrameObject>();
 			}
-			if(! VMAC_BuildHasher()) {
+			if(! VMAC_BuildHasher(fd)) {
 				return std::shared_ptr<FrameObject>();
 			}
 			auto ret = std::make_shared<FrameObject>();
@@ -88,7 +88,7 @@ namespace Sigma {
 			return ret;
 		}
 
-		bool VMAC_BuildHasher(bool isClient = false);
+		bool VMAC_BuildHasher(int fd = -1);
 		bool VerifyVMAC();
 	};
 

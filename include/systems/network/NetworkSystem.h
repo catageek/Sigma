@@ -17,7 +17,7 @@ namespace Sigma {
 	class GetSaltTaskRequest;
 
 	struct Frame_req {
-		Frame_req(int fd) : reassembled_frame(std::make_shared<FrameObject>(fd)),
+		Frame_req(int fd, vmac_pair* vmac_ptr = nullptr) : reassembled_frame(std::make_shared<FrameObject>(fd, vmac_ptr)),
 			length_requested(sizeof(Frame_hdr)), length_got(0) {};
 		std::shared_ptr<FrameObject> reassembled_frame;
 		uint32_t length_requested;
@@ -33,6 +33,7 @@ namespace Sigma {
 	public:
 		friend class network_packet_handler::INetworkPacketHandler;
 		friend class Authentication;
+		friend class KeyExchangePacket;
 
 		DLL_EXPORT NetworkSystem();
 		DLL_EXPORT virtual ~NetworkSystem() {};

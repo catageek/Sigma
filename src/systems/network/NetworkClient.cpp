@@ -91,7 +91,7 @@ namespace Sigma {
 //								Authentication::SetSalt(std::unique_ptr<std::vector<unsigned char>>(m->body.get()));
 								auto frame = body->GetKeyExchangePacket();
 								auto packet = frame->Content<KeyExchangePacket>();
-								packet->VMAC_BuildHasher(true);
+								packet->VMAC_BuildHasher();
 								SendUnauthenticatedMessage(NET_MSG, AUTH_KEY_EXCHANGE, *frame);
 								LOG_DEBUG << "Sending keys : " << frame->PacketSize() << " bytes";
 								auth_state = AUTH_KEY_EXCHANGE;

@@ -4,25 +4,34 @@
 #include <unordered_map>
 #include "Sigma.h"
 #include "systems/network/VMAC_StreamHasher.h"
-#include "systems/network/AuthenticationHandler.h"
+//#include "systems/network/AuthenticationHandler.h"
 
 namespace Sigma {
+	typedef std::pair<id_t,cryptography::VMAC_StreamHasher> vmac_pair;
+	typedef std::unique_ptr<vmac_pair> kqueue_embedded;
+
 	class VMAC_Checker {
 	public:
 		VMAC_Checker() {};
 		virtual ~VMAC_Checker() {};
 
-		static void AddEntity(const id_t entity_id, std::unique_ptr<std::vector<byte>>&& key, const byte* nonce, int nonce_size) {
+		static vmac_pair* AddEntity(const id_t entity_id, std::unique_ptr<std::vector<byte>>&& key, const byte* nonce, int nonce_size) {
 			if(! hasher_map.count(entity_id)) {
+				auto id2 = entity_id;
+				auto tmp2 = new vmac_pair(std::piecewise_construct, std::forward_as_tuple<const id_t>(std::move(id2)),
+											std::forward_as_tuple<std::unique_ptr<std::vector<byte>>, const byte*, int>(std::move(key), std::move(nonce), std::move(nonce_size)));
+				auto tmp = kqueue_embedded(std::move(tmp2));
+				auto ret = tmp.get();
 				hasher_map.emplace(std::piecewise_construct, std::forward_as_tuple<const id_t>(std::move(entity_id)),
-									std::forward_as_tuple< std::unique_ptr<std::vector<byte>>,const byte*, int>(std::move(key), std::move(nonce), std::move(nonce_size)));
+									std::forward_as_tuple<kqueue_embedded>(std::move(tmp)));
+				return ret;
 			}
 		};
 
 		static bool Verify(id_t id, const byte* digest, const byte* message, uint32_t len) {
             auto hasher = hasher_map.find(id);
             if (hasher != hasher_map.end()) {
-				return hasher->second.Verify(digest, message, len);
+				return hasher->second->second.Verify(digest, message, len);
             }
             return false;
 		};
@@ -30,7 +39,7 @@ namespace Sigma {
 		static bool Digest(id_t id, byte* digest, const byte* message, uint32_t len) {
             auto hasher = hasher_map.find(id);
             if (hasher != hasher_map.end()) {
-				hasher->second.CalculateDigest(digest, message, len);
+				hasher->second->second.CalculateDigest(digest, message, len);
 				return true;
             }
             return false;
@@ -41,7 +50,7 @@ namespace Sigma {
         };
 
 	private:
-		static std::unordered_map<id_t, cryptography::VMAC_StreamHasher> hasher_map;
+		static std::unordered_map<id_t, kqueue_embedded> hasher_map;
 
 	};	// class VMAC_Hasher
 
