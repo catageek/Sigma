@@ -29,6 +29,10 @@ namespace Sigma {
 	struct GetSaltTaskRequest;
 	struct KeyExchangePacket;
 
+	namespace cryptography {
+		class VMAC_StreamHasher;
+	}
+
 	class Authentication {
 	public:
 		Authentication()  {};
@@ -62,8 +66,9 @@ namespace Sigma {
 	struct KeyReplyPacket {
 		friend KeyExchangePacket;
 		bool VerifyVMAC();
+		bool VerifyVMAC(cryptography::VMAC_StreamHasher* hasher);
 	private:
-		bool Compute(const byte* m);
+		void Compute(const byte* m);
 		byte challenge[NONCE2_SIZE];
 		byte vmac[VMAC_SIZE];
 	};
@@ -74,21 +79,9 @@ namespace Sigma {
 		byte nonce[NONCE_SIZE];								// a random number used as nonce for the VMAC of this packet
 		byte vmac[VMAC_SIZE];								// VMAC of the message using nonce and shared secret
 
-		std::shared_ptr<FrameObject> ComputeSessionKey(int fd) {
-			if(! VerifyVMAC()) {
-				return std::shared_ptr<FrameObject>();
-			}
-			if(! VMAC_BuildHasher(fd)) {
-				return std::shared_ptr<FrameObject>();
-			}
-			auto ret = std::make_shared<FrameObject>();
-			if(! ret->Content<KeyReplyPacket>()->Compute(nonce2)) {
-				return std::shared_ptr<FrameObject>();
-			}
-			return ret;
-		}
-
-		bool VMAC_BuildHasher(int fd = -1);
+		std::shared_ptr<FrameObject> ComputeSessionKey(int fd);
+		std::unique_ptr<cryptography::VMAC_StreamHasher> VMAC_getHasher(std::unique_ptr<std::vector<byte>>&& key) const;
+		std::unique_ptr<std::vector<byte>> VMAC_BuildHasher() const;
 		bool VerifyVMAC();
 	};
 

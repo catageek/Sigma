@@ -3,6 +3,7 @@
 
 #include <memory>
 #include "netport/include/net/network.h"
+#include "composites/VMAC_Checker.h"
 
 using namespace network;
 
@@ -28,6 +29,7 @@ namespace Sigma {
 	private:
 		uint32_t auth_state;
 		TCPConnection cnx;
+		std::unique_ptr<cryptography::VMAC_StreamHasher> hasher;
 	};
 }
 

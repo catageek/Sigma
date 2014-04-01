@@ -6,7 +6,6 @@
 #include <vector>
 #include "systems/network/NetworkPacketHandler.hpp"
 #include "systems/network/NetworkClient.h"
-#include "composites/VMAC_Checker.h"
 
 #define VMAC_SIZE			8
 
@@ -36,6 +35,10 @@
 #define IS_RESTRICTED(x)	((x >> 3) != 0)
 
 namespace Sigma {
+	namespace cryptography {
+		class VMAC_StreamHasher;
+	}
+
 	struct msg_hdr {
 		uint32_t flags;
 		unsigned char type_major;
@@ -75,9 +78,6 @@ namespace Sigma {
 			data.resize(packet_size + VMAC_SIZE);
 		};
 
-
-		void Set_VMAC_Flag();
-
 		bool Verify_VMAC_tag();
 
 		template<class T, class U=T>
@@ -100,7 +100,8 @@ namespace Sigma {
 		char* Body() { return ( data.data() + sizeof(msg_hdr) + sizeof(Frame_hdr)); };
 		unsigned char* VMAC_tag() { return reinterpret_cast<unsigned char*>(data.data() + packet_size); };
 		const unsigned char* VMAC_tag() const { return reinterpret_cast<const unsigned char*>(data.data() + packet_size); };
-		void SendMessage(int fd, unsigned char major, unsigned char minor);
+		void SendMessage(int fd, unsigned char major, unsigned char minor, cryptography::VMAC_StreamHasher* hasher);
+		void SendMessageNoVMAC(int fd, unsigned char major, unsigned char minor);
 
 		std::vector<char> data;
 		uint32_t packet_size;

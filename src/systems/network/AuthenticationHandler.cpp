@@ -35,7 +35,7 @@ namespace Sigma {
 			auto reply = req->FullFrame();
 			if (reply) {
 				// send salt
-				req->SendMessage(req->fd, 1, 2);
+				req->SendMessageNoVMAC(req->fd, 1, 2);
 				Authentication::GetAuthStateMap()->At(req->fd) = AUTH_KEY_EXCHANGE;
 			}
 			else {
@@ -69,14 +69,33 @@ namespace Sigma {
 		return NetworkSystem::GetAuthenticationComponent().GetCryptoEngine()->VMAC_Verify(vmac, reinterpret_cast<const byte*>(this), VMAC_MSG_SIZE, key, nonce);
 	}
 
-	bool KeyExchangePacket::VMAC_BuildHasher(int fd) {
+	std::shared_ptr<FrameObject> KeyExchangePacket::ComputeSessionKey(int fd) {
+		if(! VerifyVMAC()) {
+			return std::shared_ptr<FrameObject>();
+		}
+		auto checker_key = VMAC_BuildHasher();
+		if(! checker_key) {
+			return std::shared_ptr<FrameObject>();
+		}
+		// TODO: Entity #id is hardcoded
+		auto hasher = VMAC_Checker::AddEntity(1, std::move(checker_key), nonce2, 8);
+		NetworkSystem::Poller()->Create(fd, reinterpret_cast<void*>(hasher));
+
+		auto ret = std::make_shared<FrameObject>();
+		ret->Content<KeyReplyPacket>()->Compute(nonce2);
+		return ret;
+	}
+
+
+	std::unique_ptr<std::vector<byte>> KeyExchangePacket::VMAC_BuildHasher() const {
 		// TODO : hard coded key of the player
 		byte key[] = "very_secret_key";
 		// The variable that will hold the hasher key for this session
 		std::unique_ptr<std::vector<byte>> checker_key(new std::vector<byte>(16));
 		// We derive the player key using the alea given by the player
 		NetworkSystem::GetAuthenticationComponent().GetCryptoEngine()->VMAC128(checker_key->data(), alea, ALEA_SIZE, key, nonce2);
-		// We store the key in the component
+		return std::move(checker_key);
+/*		// We store the key in the component
 		LOG_DEBUG << "Inserting checker";
 		if (fd <0) {
 			// client hasher is stored under id #1
@@ -89,17 +108,25 @@ namespace Sigma {
 			NetworkSystem::Poller()->Create(fd, reinterpret_cast<void*>(hasher));
 		}
 		return true;
+*/	}
+
+	std::unique_ptr<cryptography::VMAC_StreamHasher> KeyExchangePacket::VMAC_getHasher(std::unique_ptr<std::vector<byte>>&& key) const {
+		return std::unique_ptr<cryptography::VMAC_StreamHasher>(new cryptography::VMAC_StreamHasher(std::move(key), nonce2, 8));
 	}
 
-	bool KeyReplyPacket::Compute(const byte* m) {
+	void KeyReplyPacket::Compute(const byte* m) {
 		std::memcpy(challenge, m, NONCE2_SIZE);
 		// TODO : entity ID is hardcoded
-		return VMAC_Checker::Digest(1, vmac, challenge, NONCE2_SIZE);
+		VMAC_Checker::Digest(1, vmac, challenge, NONCE2_SIZE);
 	}
 
 	bool KeyReplyPacket::VerifyVMAC() {
 		// TODO : entity ID is hardcoded
 		return VMAC_Checker::Verify(1, vmac, challenge, NONCE2_SIZE);
+	}
+
+	bool KeyReplyPacket::VerifyVMAC(cryptography::VMAC_StreamHasher* hasher) {
+		return hasher->Verify(vmac, challenge, NONCE2_SIZE);
 	}
 
 	namespace network_packet_handler {
@@ -124,7 +151,7 @@ namespace Sigma {
 				auto reply_packet = req->Content<KeyExchangePacket>()->ComputeSessionKey(req->fd);
 				if(reply_packet) {
 					LOG_DEBUG << "VMAC check passed";
-					reply_packet->SendMessage(req->fd, NET_MSG, AUTH_KEY_REPLY);
+					reply_packet->SendMessageNoVMAC(req->fd, NET_MSG, AUTH_KEY_REPLY);
 					NetworkSystem::GetAuthenticationComponent().GetAuthStateMap()->At(req->fd) = AUTH_SHARE_KEY;
 					// TODO: Hardcoded entity
 					NetworkNode::AddEntity(1, network::TCPConnection(req->fd, network::NETA_IPv4, network::SCS_CONNECTED));

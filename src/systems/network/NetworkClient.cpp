@@ -40,12 +40,11 @@ namespace Sigma {
 	}
 
 	void NetworkClient::SendMessage(unsigned char major, unsigned char minor, FrameObject& packet) {
-		packet.Set_VMAC_Flag();
-		packet.SendMessage(cnx.Handle(), major, minor);
+		packet.SendMessage(cnx.Handle(), major, minor, this->hasher.get());
 	}
 
 	inline void NetworkClient::SendUnauthenticatedMessage(unsigned char major, unsigned char minor, FrameObject& packet) {
-		packet.SendMessage(cnx.Handle(), major, minor);
+		packet.SendMessageNoVMAC(cnx.Handle(), major, minor);
 	}
 
 	std::unique_ptr<FrameObject> NetworkClient::RecvMessage() {
@@ -53,6 +52,7 @@ namespace Sigma {
 		// Get the length
 		auto len = cnx.Recv(reinterpret_cast<char*>(&frame->FullFrame()->length), sizeof(uint32_t));
 		if (len <= 0) {
+			LOG_ERROR << "recv error : code " << len << " received";
 			return std::unique_ptr<FrameObject>();
 		}
 		auto length = frame->FullFrame()->length;
@@ -91,7 +91,9 @@ namespace Sigma {
 //								Authentication::SetSalt(std::unique_ptr<std::vector<unsigned char>>(m->body.get()));
 								auto frame = body->GetKeyExchangePacket();
 								auto packet = frame->Content<KeyExchangePacket>();
-								packet->VMAC_BuildHasher();
+								// TODO !!!!!
+								auto hasher_key = packet->VMAC_BuildHasher();
+								this->hasher = packet->VMAC_getHasher(std::move(hasher_key));
 								SendUnauthenticatedMessage(NET_MSG, AUTH_KEY_EXCHANGE, *frame);
 								LOG_DEBUG << "Sending keys : " << frame->PacketSize() << " bytes";
 								auth_state = AUTH_KEY_EXCHANGE;
@@ -100,7 +102,7 @@ namespace Sigma {
 							case AUTH_KEY_REPLY:
 								// We received reply
 								auto body = m->Content<KeyReplyPacket>();
-								if (body->VerifyVMAC()) {
+								if (body->VerifyVMAC(this->hasher.get())) {
 									LOG_DEBUG << "Secure key created";
 									auth_state = AUTH_SHARE_KEY;
 								}

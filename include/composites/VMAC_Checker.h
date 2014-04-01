@@ -4,7 +4,6 @@
 #include <unordered_map>
 #include "Sigma.h"
 #include "systems/network/VMAC_StreamHasher.h"
-//#include "systems/network/AuthenticationHandler.h"
 
 namespace Sigma {
 	typedef std::pair<id_t,cryptography::VMAC_StreamHasher> vmac_pair;
@@ -26,24 +25,15 @@ namespace Sigma {
 									std::forward_as_tuple<kqueue_embedded>(std::move(tmp)));
 				return ret;
 			}
-		};
+		}
 
 		static bool Verify(id_t id, const byte* digest, const byte* message, uint32_t len) {
-            auto hasher = hasher_map.find(id);
-            if (hasher != hasher_map.end()) {
-				return hasher->second->second.Verify(digest, message, len);
-            }
-            return false;
-		};
+			return hasher_map.find(id)->second->second.Verify(digest, message, len);
+		}
 
-		static bool Digest(id_t id, byte* digest, const byte* message, uint32_t len) {
-            auto hasher = hasher_map.find(id);
-            if (hasher != hasher_map.end()) {
-				hasher->second->second.CalculateDigest(digest, message, len);
-				return true;
-            }
-            return false;
-		};
+		static void Digest(id_t id, byte* digest, const byte* message, uint32_t len) {
+			hasher_map.find(id)->second->second.CalculateDigest(digest, message, len);
+		}
 
         static void RemoveEntity(const id_t id) {
             hasher_map.erase(id);
