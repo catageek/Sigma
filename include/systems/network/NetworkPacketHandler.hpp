@@ -21,7 +21,7 @@ namespace Sigma {
 
 		class INetworkPacketHandler {
 		public:
-			template<int Major, int Minor>
+			template<int Major, int Minor, bool isClient>
 			static void Process() {
 				LOG_DEBUG << "parent process here...";
 			};

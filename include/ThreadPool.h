@@ -102,37 +102,34 @@ namespace Sigma {
 
 	class ThreadPool {
 	public:
-		ThreadPool(unsigned int nr_thread);
-		virtual ~ThreadPool() {};
-
-		void Initialize();
+		static void Initialize(unsigned int nr_thread);
 
 		template<class T>
-		void Execute(const std::shared_ptr<TaskReq<T>>& task) {
+		static void Execute(const std::shared_ptr<TaskReq<T>>& task) {
 			task->RunTask();
 		}
 
 		template<class T>
-		void Queue(std::shared_ptr<TaskReq<T>>& task) {
+		static void Queue(std::shared_ptr<TaskReq<T>>& task) {
 			return Queue(task, identity<T>());
 		}
 
 		template<class T>
-		void Queue(std::shared_ptr<TaskReq<T>>&& task) {
+		static void Queue(std::shared_ptr<TaskReq<T>>&& task) {
 			return Queue(std::move(task), identity<T>());
 		}
 
 	private:
 
 		template<class T,class U>
-		void Queue(U&& task, identity<T>) {
+		static void Queue(U&& task, identity<T>) {
 			std::unique_lock<std::mutex> locker(m_queue);
 			taskqueue.push_back(std::forward<U>(task));
 			queuecheck.notify_one();
 		}
 
 		template<class U>
-		void Queue(U&& task, identity<chain_t>) {
+		static void Queue(U&& task, identity<chain_t>) {
 			std::unique_lock<std::mutex> locker(m_queue);
 /*			for (auto t : taskqueue) {
 				if (t == task) {
@@ -144,14 +141,14 @@ namespace Sigma {
 			queuecheck.notify_one();
 		}
 
-		void Poll();
+		static void Poll();
 
-		std::list<std::shared_ptr<TaskQueueElement>> taskqueue;
-		int counter;
-		std::mutex m_queue;
-		std::mutex m_count;
-		std::mutex m_print;
-		std::condition_variable queuecheck;
+		static std::list<std::shared_ptr<TaskQueueElement>> taskqueue;
+		static int counter;
+		static std::mutex m_queue;
+		static std::mutex m_count;
+		static std::mutex m_print;
+		static std::condition_variable queuecheck;
 	};
 }
 

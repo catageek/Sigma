@@ -7,7 +7,7 @@
 #include <iostream>
 
 namespace Sigma {
-	void Crypto::InitializeDH() {
+/*	void Crypto::InitializeDH() {
 		// http://tools.ietf.org/html/rfc5114#section-2.2
 		Integer p("0xAD107E1E9123A9D0D660FAA79559C51FA20D64E5683B9FD1"
 			"B54B1597B61D0A75E6FA141DF95A56DBAF9A3C407BA1DF15"
@@ -44,6 +44,14 @@ namespace Sigma {
 		_dh.GenerateKeyPair(_prng, _priv, _pub);
 	}
 
+	void Crypto::GetPublicKeys(char* buffer) const {
+		std::memcpy(buffer, _pub, _dh.PublicKeyLength());
+	}
+
+*/
+
+	AutoSeededRandomPool Crypto::_prng(false);
+
 	void Crypto::GetRandom64(byte* nonce) {
 		_prng.GenerateBlock(nonce, 8);
 	};
@@ -52,38 +60,16 @@ namespace Sigma {
 		_prng.GenerateBlock(nonce, 16);
 	};
 
-	void Crypto::GetPublicKeys(char* buffer) const {
-		std::memcpy(buffer, _pub, _dh.PublicKeyLength());
-	}
-
 	void Crypto::VMAC64(byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce) {
 		CryptoPP::VMAC<CryptoPP::AES, 64> hasher;
 		hasher.SetKey(key, 16, MakeParameters(Name::IV(), ConstByteArrayParameter(nonce, 8), false));
 		hasher.CalculateDigest(digest, message, len);
-		Integer vmac, nonc, k, m;
-		vmac.Decode(digest, 8);
-		nonc.Decode(nonce, 8);
-		k.Decode(key, 16);
-		m.Decode(message, len);
-		std::cout << "VMAC is " << std::hex << vmac << std::endl;
-		std::cout << "nonce is " << std::hex << nonc << std::endl;
-		std::cout << "key is " << std::hex << k << std::endl;
-		std::cout << "message is " << std::hex << m << std::endl;
 	}
 
 	void Crypto::VMAC128(byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce) {
 		CryptoPP::VMAC<CryptoPP::AES, 128> hasher;
 		hasher.SetKey(key, 16, MakeParameters(Name::IV(), ConstByteArrayParameter(nonce, 16), false));
 		hasher.CalculateDigest(digest, message, len);
-		Integer vmac, nonc, k, m;
-		vmac.Decode(digest, 16);
-		nonc.Decode(nonce, 16);
-		k.Decode(key, 16);
-		m.Decode(message, len);
-		std::cout << "VMAC is " << std::hex << vmac << std::endl;
-		std::cout << "nonce is " << std::hex << nonc << std::endl;
-		std::cout << "key is " << std::hex << k << std::endl;
-		std::cout << "message is " << std::hex << m << std::endl;
 	}
 
 	bool Crypto::VMAC_Verify(const byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce) {

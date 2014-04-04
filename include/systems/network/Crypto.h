@@ -14,27 +14,21 @@ namespace Sigma {
 
 	class Crypto {
 	public:
-		Crypto(bool blocking = false) : _prng(blocking) {};
-		virtual ~Crypto() {};
+//		void InitializeDH();
+//		void GetPublicKeys(char* buffer) const;
+		static void VMAC64(byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce);
+		static void VMAC128(byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce);
+		static bool VMAC_Verify(const byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce);
 
-		void InitializeDH();
-		void GetPublicKeys(char* buffer) const;
-		void VMAC64(byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce);
-		void VMAC128(byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce);
-		bool VMAC_Verify(const byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce);
-
-		void GetRandom64(byte* nonce);
-		void GetRandom128(byte* nonce);
-
-		void SetSalt(std::unique_ptr<std::vector<byte>>&& salt) { _salt = std::move(salt); };
+		static void GetRandom64(byte* nonce);
+		static void GetRandom128(byte* nonce);
 
 	private:
 
-		DH _dh;
+/*		DH _dh;
 		SecByteBlock _priv;
 		SecByteBlock _pub;
-		AutoSeededRandomPool _prng;
-		std::unique_ptr<std::vector<byte>> _salt;
+*/		static AutoSeededRandomPool _prng;
 	};
 }
 

@@ -2,7 +2,7 @@
 #include "Sigma.h"
 #include "netport/include/net/network.h"
 #include "composites/NetworkNode.h"
-#include "systems/network/VMAC_StreamHasher.h"
+#include "composites/VMAC_Checker.h"
 
 using namespace network;
 
@@ -52,7 +52,8 @@ namespace Sigma {
 		data.resize(packet_size);
 	}
 
-	bool FrameObject::Verify_VMAC_tag() {
+	template<>
+	bool FrameObject::Verify_Authenticity<false>() {
 		if(Header()->flags & (1 << HAS_VMAC_TAG)) {
 			packet_size -= VMAC_SIZE;
 			return vmac_verifier->second.Verify(VMAC_tag(), reinterpret_cast<const unsigned char*>(data.data()), packet_size);

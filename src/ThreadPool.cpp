@@ -5,14 +5,17 @@
 namespace Sigma {
 	std::function<void(std::shared_ptr<TaskReq<chain_t>>)> TaskReq<chain_t>::queue_task;
 
+	std::list<std::shared_ptr<TaskQueueElement>> ThreadPool::taskqueue;
+	int ThreadPool::counter = 0;
+	std::mutex ThreadPool::m_queue;
+	std::mutex ThreadPool::m_count;
+	std::mutex ThreadPool::m_print;
+	std::condition_variable ThreadPool::queuecheck;
 
-	ThreadPool::ThreadPool(unsigned int nr_thread) : counter(0) {
+	void ThreadPool::Initialize(unsigned int nr_thread) {
 		for (auto i = 0; i < nr_thread; ++i) {
-			std::thread(&ThreadPool::Poll, this).detach();
+			std::thread(&ThreadPool::Poll).detach();
 		}
-	}
-
-	void ThreadPool::Initialize() {
 		TaskReq<chain_t>::Initialize([&](std::shared_ptr<TaskReq<chain_t>> c) { Queue(c); });
 	}
 
@@ -25,7 +28,7 @@ namespace Sigma {
 			{
 				// Wait for a task to do
 				std::unique_lock<std::mutex> locker(m_queue);
-				if (taskqueue.empty()){
+				while (taskqueue.empty()){
 					queuecheck.wait(locker, [&](){return ! taskqueue.empty();});
 				}
 				// Get the task to do

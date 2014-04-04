@@ -17,6 +17,9 @@ namespace Sigma {
 			_nonce_ptr = _nonce.data();
 			std::memcpy(_nonce_ptr, nonce, nonce_size);
 			_hasher.SetKey(_key_ptr, _key_size, MakeParameters(Name::IV(), ConstByteArrayParameter(_nonce_ptr, _nonce_size, false), false));
+			Integer nonc, k;
+			nonc.Decode(_nonce_ptr, _nonce_size);
+			k.Decode(_key->data(), 16);
 		};
 
 		bool VMAC_StreamHasher::Verify(const byte* digest, const byte* message, int len) {
@@ -27,7 +30,7 @@ namespace Sigma {
 			nonc.Decode(_nonce_ptr, _nonce_size);
 			k.Decode(_key->data(), 16);
 			m.Decode(message, len);
-			std::cout << "Verify VMAC" << std::endl;
+			std::cout << ">>Verify VMAC" << std::endl;
 			std::cout << "VMAC is " << std::hex << vmac << std::endl;
 			std::cout << "nonce is " << std::hex << nonc << std::endl;
 			std::cout << "key is " << std::hex << k << std::endl;
@@ -44,7 +47,7 @@ namespace Sigma {
 			nonc.Decode(_nonce_ptr, _nonce_size);
 			k.Decode(_key->data(), 16);
 			m.Decode(message, len);
-			std::cout << "Compute VMAC" << std::endl;
+			std::cout << ">>Compute VMAC" << std::endl;
 			std::cout << "VMAC is " << std::hex << vmac << std::endl;
 			std::cout << "nonce is " << std::hex << nonc << std::endl;
 			std::cout << "key is " << std::hex << k << std::endl;

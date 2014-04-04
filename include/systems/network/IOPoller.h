@@ -23,7 +23,8 @@ namespace Sigma {
 
 		void CreatePermanent(int fd);
 
-		void Watch(int fd);
+		template<bool isClient>
+		void Watch(int fd) {};
 
 		void Unwatch(int fd);
 
@@ -67,7 +68,8 @@ namespace Sigma {
 		}
 	}
 
-	inline void IOPoller::Watch(int fd) {
+	template<>
+	inline void IOPoller::Watch<false>(int fd) {
 		IOEvent e(fd, EVFILT_READ, EV_ENABLE);
 		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
 		if (i == -1) {
@@ -87,7 +89,8 @@ namespace Sigma {
 	}
 
 	inline int IOPoller::Poll(std::vector<struct kevent>& v) {
-		return kevent(kqhandle, NULL, 0, v.data(), v.size(), &ts);
+//		return kevent(kqhandle, NULL, 0, v.data(), v.size(), &ts);
+		return kevent(kqhandle, NULL, 0, v.data(), v.size(), NULL);
 	}
 }
 

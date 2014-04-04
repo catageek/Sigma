@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include "AtomicMap.hpp"
+#include "AtomicQueue.hpp"
 #include "ThreadPool.h"
 #include "systems/network/Crypto.h"
 #include "systems/network/Protocol.h"
@@ -28,6 +29,8 @@
 namespace Sigma {
 	struct GetSaltTaskRequest;
 	struct KeyExchangePacket;
+	class FrameObject;
+	class NetworkSystem;
 
 	namespace cryptography {
 		class VMAC_StreamHasher;
@@ -35,9 +38,11 @@ namespace Sigma {
 
 	class Authentication {
 	public:
-		Authentication()  {};
+		Authentication() {};
 
-		void Initialize() {
+		template<bool isClient>
+		void Initialize(NetworkSystem* netsystem) {
+			Authentication::SetSystem<isClient>(netsystem);
 			auto f = chain_t({
 				std::bind(&Sigma::Authentication::RetrieveSalt, this),
 				std::bind(&Sigma::Authentication::SendSalt, this)
@@ -45,19 +50,22 @@ namespace Sigma {
 			auth_init_handler = std::make_shared<chain_t>(f);
 		}
 
-		std::shared_ptr<chain_t> GetAuthInitHandler() { return auth_init_handler; };
-		Crypto* GetCryptoEngine() { return &crypto; };
-		void SetSalt(std::unique_ptr<std::vector<byte>>&& salt) { crypto.SetSalt(std::move(salt)); };
-		AtomicMap<int,char>* GetAuthStateMap() { return &auth_state; };
+		template<bool isClient = false>
+		static NetworkSystem* GetNetworkSystem() { return netsystem; };
+
+		static std::shared_ptr<chain_t> GetAuthInitHandler() { return auth_init_handler; };
 	private:
 
 		int RetrieveSalt();
 
 		int SendSalt();
 
-		Crypto crypto;
-		AtomicMap<int,char> auth_state;						// state of the connections
-		std::shared_ptr<chain_t> auth_init_handler;
+		template<bool isClient>
+		static void SetSystem(NetworkSystem* system) { netsystem = system; };
+
+		static NetworkSystem* netsystem;
+		static NetworkSystem* netsystem_client;
+		static std::shared_ptr<chain_t> auth_init_handler;
 		AtomicQueue<std::shared_ptr<FrameObject>> salt_retrieved;
 	};
 
@@ -101,6 +109,20 @@ namespace Sigma {
 		char* login;
 		int fd;
 	};
+
+	namespace network_packet_handler {
+		template<>
+		void INetworkPacketHandler::Process<NET_MSG,AUTH_INIT, false>();
+
+		template<>
+		void INetworkPacketHandler::Process<NET_MSG,AUTH_SEND_SALT, true>();
+
+		template<>
+		void INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE, false>();
+
+		template<>
+		void INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_REPLY, true>();
+	}
 }
 
 #endif // AUTHENTICATIONHANDLER_H_INCLUDED

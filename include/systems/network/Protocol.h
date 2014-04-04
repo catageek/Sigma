@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 #include "systems/network/NetworkPacketHandler.hpp"
-#include "systems/network/NetworkClient.h"
+#include "composites/VMAC_Checker.h"
 
 #define VMAC_SIZE			8
 
@@ -58,9 +58,8 @@ namespace Sigma {
 	class FrameObject {
 	public:
 		friend class Authentication;
-		template<int Major,int Minor> friend void network_packet_handler::INetworkPacketHandler::Process();
-		friend void NetworkClient::SendMessage(unsigned char, unsigned char, FrameObject&);
-		friend void NetworkClient::SendUnauthenticatedMessage(unsigned char, unsigned char, FrameObject&);
+		template<int Major,int Minor,bool isClient> friend void network_packet_handler::INetworkPacketHandler::Process();
+		friend class NetworkSystem;
 
 		template<class T=Frame_hdr>
 		FrameObject(int fd = -1, vmac_pair* vmac_ptr = nullptr) : fd(fd), packet_size(sizeof(T)), data(std::vector<char>(sizeof(T) + VMAC_SIZE)),
@@ -78,7 +77,8 @@ namespace Sigma {
 			data.resize(packet_size + VMAC_SIZE);
 		};
 
-		bool Verify_VMAC_tag();
+		template<bool isClient>
+		bool Verify_Authenticity() { return true; };
 
 		template<class T, class U=T>
 		U* Content() {

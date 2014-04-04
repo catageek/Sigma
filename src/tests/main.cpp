@@ -14,7 +14,7 @@
 #include "OS.h"
 #include "components/SpotLight.h"
 #include "systems/network/Protocol.h"
-#include "systems/network/NetworkClient.h"
+#include "systems/network/NetworkSystem.h"
 #include "systems/network/TestPacketHandler.h"
 
 #ifdef _WIN32
@@ -48,7 +48,7 @@ int main(int argCount, char **argValues) {
 	Sigma::OpenALSystem alsys;
 	Sigma::BulletPhysics bphys;
 
-	Sigma::NetworkClient netclient;
+	Sigma::NetworkSystem netclient;
 
 	Sigma::FactorySystem& factory = Sigma::FactorySystem::getInstance();
 
@@ -106,8 +106,10 @@ int main(int argCount, char **argValues) {
 	// Start to listen network //
 	/////////////////////////////
 
-	netclient.Start();
-	if(! netclient.Connect("127.0.0.1", 7777)) {
+//	netclient.Start();
+	Sigma::ThreadPool::Initialize(5);
+	netclient.SetTCPHandler<true>();
+	if(! netclient.Connect("127.0.0.1", 7777, "my_login")) {
 		LOG_ERROR << "Could not authenticate on server.";
 	};
 

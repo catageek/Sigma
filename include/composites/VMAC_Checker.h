@@ -15,16 +15,15 @@ namespace Sigma {
 		virtual ~VMAC_Checker() {};
 
 		static vmac_pair* AddEntity(const id_t entity_id, std::unique_ptr<std::vector<byte>>&& key, const byte* nonce, int nonce_size) {
-			if(! hasher_map.count(entity_id)) {
-				auto id2 = entity_id;
-				auto tmp2 = new vmac_pair(std::piecewise_construct, std::forward_as_tuple<const id_t>(std::move(id2)),
-											std::forward_as_tuple<std::unique_ptr<std::vector<byte>>, const byte*, int>(std::move(key), std::move(nonce), std::move(nonce_size)));
-				auto tmp = kqueue_embedded(std::move(tmp2));
-				auto ret = tmp.get();
-				hasher_map.emplace(std::piecewise_construct, std::forward_as_tuple<const id_t>(std::move(entity_id)),
-									std::forward_as_tuple<kqueue_embedded>(std::move(tmp)));
-				return ret;
-			}
+			RemoveEntity(entity_id);
+			auto id2 = entity_id;
+			auto tmp2 = new vmac_pair(std::piecewise_construct, std::forward_as_tuple<const id_t>(std::move(id2)),
+										std::forward_as_tuple<std::unique_ptr<std::vector<byte>>, const byte*, int>(std::move(key), std::move(nonce), std::move(nonce_size)));
+			auto tmp = kqueue_embedded(std::move(tmp2));
+			auto ret = tmp.get();
+			hasher_map.emplace(std::piecewise_construct, std::forward_as_tuple<const id_t>(std::move(entity_id)),
+								std::forward_as_tuple<kqueue_embedded>(std::move(tmp)));
+			return ret;
 		}
 
 		static bool Verify(id_t id, const byte* digest, const byte* message, uint32_t len) {
