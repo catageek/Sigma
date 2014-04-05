@@ -123,45 +123,4 @@ namespace Sigma {
 		NetworkNode::RemoveEntity(id);
 		VMAC_Checker::RemoveEntity(id);
 	}
-
-
-	int NetworkSystem::ReassembleFrame(AtomicQueue<std::shared_ptr<Frame_req>>* input, AtomicQueue<std::shared_ptr<FrameObject>>* output) {
-		std::shared_ptr<Frame_req> req;
-		if(! input->Pop(req)) {
-			return STOP;
-		}
-		auto target_size = req->length_requested;
-		auto frame = req->reassembled_frame;
-		char* buffer = reinterpret_cast<char*>(frame->FullFrame());
-
-		auto current_size = req->length_got;
-
-		auto len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
-		current_size += len;
-		req->length_got = current_size;
-
-		if(current_size == sizeof(Frame_hdr) && target_size == sizeof(Frame_hdr)) {
-			// We now have the length
-			auto length = frame->FullFrame()->length;
-			target_size = frame->FullFrame()->length + sizeof(Frame_hdr);
-			req->length_requested = target_size;
-			frame->Resize<false>(length - sizeof(msg_hdr));
-			buffer = reinterpret_cast<char*>(frame->FullFrame());
-			auto len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
-			current_size += len;
-			req->length_got = current_size;
-		}
-
-		if (current_size < target_size) {
-			// we put again the request in the queue
-			LOG_DEBUG << "got only " << current_size << " bytes, waiting " << target_size << " bytes";
-			input->Push(req);
-			return REPEAT;
-		}
-		else {
-			LOG_DEBUG << "Packet of " << current_size << " put in dispatch queue.";
-			output->Push(frame);
-		}
-		return CONTINUE;
-	}
 }

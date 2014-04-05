@@ -26,9 +26,10 @@ namespace Sigma {
 			return ret;
 		}
 
-		void Push(T element) {
+		template<class U>
+		void Push(U&& element) {
 			mtx.lock();
-			q->push_back(element);
+			q->push_back(std::forward<U>(element));
 			mtx.unlock();
 		}
 

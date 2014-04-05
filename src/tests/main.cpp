@@ -114,8 +114,11 @@ int main(int argCount, char **argValues) {
 	};
 
 	Sigma::FrameObject packet{};
-	std::strcpy(packet.Content<Sigma::TestPacket>()->message, std::string("trillek").c_str());
-	netclient.SendMessage(TEST, TEST, packet);
+	for(auto i = 0; i < 25; ++i) {
+		std::string str("tril");
+		std::strcpy(packet.Content<Sigma::TestPacket>()->message, str.append(std::to_string(i)).c_str());
+		netclient.SendMessage(TEST, TEST, packet);
+	}
 
 	// Create hard coded entity ID #1
 	// position is hardcoded

@@ -92,6 +92,8 @@ namespace Sigma {
 
 		id_t GetId() const;
 
+		vmac_pair* GetVMACVerifier() const { return vmac_verifier; };
+
 		msg_hdr* Header() { return reinterpret_cast<msg_hdr*>(data.data() + sizeof(Frame_hdr)); };
 		Frame_hdr* FullFrame() { return reinterpret_cast<Frame_hdr*>(data.data()); };
 

@@ -7,7 +7,6 @@
 #include "Sigma.h"
 #include "systems/network/IOPoller.h"
 #include "AtomicQueue.hpp"
-#include "ThreadPool.h"
 #include "systems/network/Protocol.h"
 #include "systems/network/AuthenticationHandler.h"
 #include "netport/include/net/network.h"
@@ -31,11 +30,17 @@ namespace Sigma {
 	}
 
 	struct Frame_req {
-		Frame_req(int fd, vmac_pair* vmac_ptr = nullptr) : reassembled_frame(std::make_shared<FrameObject>(fd, vmac_ptr)),
-			length_requested(sizeof(Frame_hdr)), length_got(0) {};
+		Frame_req(int fd, size_t length_total, vmac_pair* vmac_ptr = nullptr) : reassembled_frame(std::make_shared<FrameObject>(fd, vmac_ptr)),
+			length_total(length_total), length_requested(sizeof(Frame_hdr)), length_got(0) {};
+
+		// delete copy constructor and assignment for zero-copy guarantee
+		Frame_req(Frame_req&) = delete;
+		Frame_req& operator=(Frame_req&) = delete;
+
 		std::shared_ptr<FrameObject> reassembled_frame;
 		uint32_t length_requested;
 		uint32_t length_got;
+		size_t length_total;
 		void (*return_queue)(void);
 	};
 
@@ -87,6 +92,7 @@ namespace Sigma {
 			start = chain_t({
 				// Poll the socket and select the next chain to run
 				[&](){
+					std::this_thread::sleep_for(std::chrono::milliseconds(100));
 					std::vector<struct kevent> evList(32);
 					LOG_DEBUG << "Polling...";
 					auto nev = Poller()->Poll(evList);
@@ -94,6 +100,7 @@ namespace Sigma {
 						LOG_ERROR << "Error when polling event";
 					}
 					LOG_DEBUG << "got " << nev << " kqueue events";
+					bool a = false, b = false;
 					for (auto i=0; i<nev; i++) {
 						auto fd = evList[i].ident;
 						if (evList[i].flags & EV_EOF) {
@@ -125,27 +132,36 @@ namespace Sigma {
 								// Request the frame header
 								// queue the task to reassemble the frame
 								LOG_DEBUG << "got unauthenticated frame";
-								NetworkSystem::GetPublicRawFrameReqQueue()->Push(std::make_shared<Frame_req>(fd));
-								ThreadPool::Queue(std::make_shared<TaskReq<chain_t>>(unauthenticated_recv_data));
+								NetworkSystem::GetPublicRawFrameReqQueue()->Push(std::make_shared<Frame_req>(fd, evList[i].data));
+								a = true;
 							}
 							else {
 								// We stop watching the connection until we got all the frame
 								LOG_DEBUG << "got authenticated frame";
 								// Data received from authenticated client
-								NetworkSystem::GetAuthenticatedRawFrameReqQueue()->Push(std::make_shared<Frame_req>(fd, reinterpret_cast<vmac_pair*>(evList[i].udata)));
-								ThreadPool::Queue(std::make_shared<TaskReq<chain_t>>(authenticated_recv_data));
+								NetworkSystem::GetAuthenticatedRawFrameReqQueue()->Push(std::make_shared<Frame_req>(fd, evList[i].data, reinterpret_cast<vmac_pair*>(evList[i].udata)));
+								b = true;
 							}
 						}
 					}
-					// Queue a task to wait another event
-					std::this_thread::sleep_for(std::chrono::milliseconds(100));
-					return REPEAT;
+					if(a) {
+						ThreadPool::Queue(std::make_shared<TaskReq<chain_t>>(unauthenticated_recv_data));
+					}
+					if(b) {
+						ThreadPool::Queue(std::make_shared<TaskReq<chain_t>>(start));
+						ThreadPool::Execute(std::make_shared<TaskReq<chain_t>>(authenticated_recv_data));
+					}
+					else {
+						// Queue a task to wait another event
+						return REPEAT;
+					}
+					return STOP;
 				}
 			});
 
 			unauthenticated_recv_data = chain_t({
 				// Get the length
-				std::bind(&NetworkSystem::ReassembleFrame, this, &pub_rawframe_req, &pub_frame_req),
+				std::bind(&NetworkSystem::ReassembleFrame<isClient>, this, &pub_rawframe_req, &pub_frame_req),
 				[&](){
 					auto req_list = NetworkSystem::GetPublicReassembledFrameQueue()->Poll();
 					if (! req_list) {
@@ -167,26 +183,22 @@ namespace Sigma {
 								switch(minor) {
 									case AUTH_INIT:
 										{
-											network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_INIT>()->Push(req);
-											network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_INIT, isClient>();
+											network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_INIT>()->Push(std::move(req));
 											break;
 										}
 									case AUTH_SEND_SALT:
 										{
-											network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_SEND_SALT>()->Push(req);
-											network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_SEND_SALT, isClient>();
+											network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_SEND_SALT>()->Push(std::move(req));
 											break;
 										}
 									case AUTH_KEY_EXCHANGE:
 										{
-											network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_KEY_EXCHANGE>()->Push(req);
-											network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE, isClient>();
+											network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_KEY_EXCHANGE>()->Push(std::move(req));
 											break;
 										}
 									case AUTH_KEY_REPLY:
 										{
-											network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_KEY_REPLY>()->Push(req);
-											network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_REPLY, isClient>();
+											network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_KEY_REPLY>()->Push(std::move(req));
 											break;
 										}
 									default:
@@ -203,7 +215,18 @@ namespace Sigma {
 								CloseConnection(req->GetId(), req->fd);
 							}
 						}
-						poller.Watch<isClient>(req->fd);
+					}
+					if(! network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG, AUTH_INIT>()->Empty()) {
+						network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_INIT, isClient>();
+					}
+					if(! network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG, AUTH_SEND_SALT>()->Empty()) {
+						network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_SEND_SALT, isClient>();
+					}
+					if(! network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG, AUTH_KEY_EXCHANGE>()->Empty()) {
+						network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE, isClient>();
+					}
+					if(! network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG, AUTH_KEY_REPLY>()->Empty()) {
+						network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_REPLY, isClient>();
 					}
 					return STOP;
 				}
@@ -211,17 +234,19 @@ namespace Sigma {
 
 			authenticated_recv_data = chain_t({
 				// Get the length
-				std::bind(&NetworkSystem::ReassembleFrame, this, &auth_rawframe_req, &auth_frame_req),
+				std::bind(&NetworkSystem::ReassembleFrame<isClient>, this, &auth_rawframe_req, &auth_frame_req),
 				[&](){
-					std::shared_ptr<FrameObject> req;
-					if(! NetworkSystem::GetAuthenticatedReassembledFrameQueue()->Pop(req)) {
+					auto req_list = NetworkSystem::GetAuthenticatedReassembledFrameQueue()->Poll();
+					if (! req_list) {
 						return STOP;
 					}
-					if(req->Verify_Authenticity<isClient>()) {
-						NetworkSystem::GetAuthenticatedCheckedFrameQueue()->Push(req);
-					}
-					else {
-						LOG_DEBUG << "Dropping 1 frame (VMAC check failed)";
+					for(std::shared_ptr<FrameObject>& req : *req_list) {
+						if(req->Verify_Authenticity<isClient>()) {
+							NetworkSystem::GetAuthenticatedCheckedFrameQueue()->Push(std::move(req));
+						}
+						else {
+							LOG_DEBUG << "Dropping 1 frame (VMAC check failed)";
+						}
 					}
 					return CONTINUE;
 				},
@@ -242,7 +267,7 @@ namespace Sigma {
 								switch(minor) {
 									case TEST:
 										{
-											network_packet_handler::INetworkPacketHandler::GetQueue<TEST,TEST>()->Push(req);
+											network_packet_handler::INetworkPacketHandler::GetQueue<TEST,TEST>()->Push(std::move(req));
 											network_packet_handler::INetworkPacketHandler::Process<TEST,TEST, isClient>();
 											break;
 										}
@@ -260,7 +285,6 @@ namespace Sigma {
 								CloseConnection(req->GetId(), req->fd);
 							}
 						}
-						poller.Watch<isClient>(req->fd);
 					}
 					return STOP;
 				}
@@ -280,8 +304,6 @@ namespace Sigma {
 		void CloseClientConnection();
 		void CloseConnection(id_t id, int fd);
 
-		int ReassembleFrame(AtomicQueue<std::shared_ptr<Frame_req>>* input, AtomicQueue<std::shared_ptr<FrameObject>>* output);
-
 		int ssocket;											// the listening socket
 		IOPoller poller;
 		Authentication authentication;
@@ -291,7 +313,6 @@ namespace Sigma {
 		chain_t unauthenticated_recv_data;
 		chain_t authenticated_recv_data;
 
-		static ThreadPool thread_pool;
 		AtomicQueue<std::shared_ptr<Frame_req>> auth_rawframe_req;				// raw frame request, to be authenticated
 		AtomicQueue<std::shared_ptr<FrameObject>> auth_frame_req;				// reassembled frame request, to be authenticated
 		AtomicQueue<std::shared_ptr<FrameObject>> auth_checked_frame_req;		// reassembled frame request, authenticated
@@ -305,6 +326,56 @@ namespace Sigma {
 		network::TCPConnection cnx;
 		std::condition_variable is_connected;
 		std::mutex connecting;
+
+		template<bool isClient>
+		int ReassembleFrame(AtomicQueue<std::shared_ptr<Frame_req>>* input, AtomicQueue<std::shared_ptr<FrameObject>>* output) {
+			std::shared_ptr<Frame_req> req;
+			if(! input->Pop(req)) {
+				return STOP;
+			}
+			auto target_size = req->length_requested;
+			auto frame = req->reassembled_frame;
+			char* buffer = reinterpret_cast<char*>(frame->FullFrame());
+
+			auto current_size = req->length_got;
+
+			auto len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
+			current_size += len;
+			req->length_got = current_size;
+
+			if(current_size == sizeof(Frame_hdr) && target_size == sizeof(Frame_hdr)) {
+				// We now have the length
+				auto length = frame->FullFrame()->length;
+				target_size = frame->FullFrame()->length + sizeof(Frame_hdr);
+				req->length_requested = target_size;
+				frame->Resize<false>(length - sizeof(msg_hdr));
+				buffer = reinterpret_cast<char*>(frame->FullFrame());
+				auto len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
+				current_size += len;
+				req->length_got = current_size;
+			}
+
+			if (current_size < target_size) {
+				// we put again the request in the queue
+				LOG_DEBUG << "got only " << current_size << " bytes, waiting " << target_size << " bytes";
+				input->Push(std::move(req));
+				return REPEAT;
+			}
+			else {
+				LOG_DEBUG << "Packet of " << current_size << " put in dispatch queue.";
+				output->Push(std::move(frame));
+				if( current_size < req->length_total ) {
+					req->length_total -= current_size;
+					LOG_DEBUG << "Get another packet from fd #" << req->reassembled_frame->fd << " frome same frame.";
+					input->Push(std::make_shared<Frame_req>(req->reassembled_frame->fd, req->length_total, req->reassembled_frame->GetVMACVerifier()));
+					return REPEAT;
+				}
+				else {
+					poller.Watch<isClient>(req->reassembled_frame->fd);
+				}
+			}
+			return CONTINUE;
+		}
 	};
 }
 
