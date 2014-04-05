@@ -15,6 +15,13 @@ namespace Sigma {
 	// for example the rotational and directional forces are grouped in ControllableMove
 	typedef std::string CompositeID;
 
+	// make_unique will be in C++14. Implemented here since we're using C++11.
+	template<typename T, typename... Args>
+	std::unique_ptr<T> make_unique(Args&&... args)
+	{
+		return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+	}
+
 	namespace reflection {
 		// Template methods that can be used for reflection.
 		// To use them just call GetTypeName<MyType>() to retrieve the name for the specified type.

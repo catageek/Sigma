@@ -1,6 +1,7 @@
 #include "ThreadPool.h"
 #include <thread>
 #include <iostream>
+#include <utmpx.h>
 
 namespace Sigma {
 	std::function<void(std::shared_ptr<TaskReq<chain_t>>)> TaskReq<chain_t>::queue_task;
@@ -13,6 +14,7 @@ namespace Sigma {
 	std::condition_variable ThreadPool::queuecheck;
 
 	void ThreadPool::Initialize(unsigned int nr_thread) {
+		LOG_DEBUG << "hardware concurrency " << std::thread::hardware_concurrency();
 		for (auto i = 0; i < nr_thread; ++i) {
 			std::thread(&ThreadPool::Poll).detach();
 		}
@@ -29,6 +31,7 @@ namespace Sigma {
 				// Wait for a task to do
 				std::unique_lock<std::mutex> locker(m_queue);
 				while (taskqueue.empty()){
+					LOG_DEBUG << "Blocking thread #" << std::this_thread::get_id();
 					queuecheck.wait(locker, [&](){return ! taskqueue.empty();});
 				}
 				// Get the task to do
@@ -54,7 +57,7 @@ namespace Sigma {
 				counter++;
 				{
 					std::unique_lock<std::mutex> locker(m_print);
-					LOG_DEBUG << "Launching new worker. We have " << counter << " worker(s)";
+					LOG_DEBUG << "Unblocking thread #" << std::this_thread::get_id() << " on cpu #" << sched_getcpu() << ". We have " << counter << " thread(s) running";
 				}
 			}
 
@@ -67,7 +70,7 @@ namespace Sigma {
 				queuecheck.notify_one();
 				{
 					std::unique_lock<std::mutex> locker(m_print);
-					LOG_DEBUG << "Stopping worker. We have " << counter << " worker(s)";
+					LOG_DEBUG << "Thread #" << std::this_thread::get_id() << " has commpleted task. We have " << counter << " thread(s) running";
 				}
 			}
 		}

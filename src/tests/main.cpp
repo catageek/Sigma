@@ -113,11 +113,11 @@ int main(int argCount, char **argValues) {
 		LOG_ERROR << "Could not authenticate on server.";
 	};
 
-	Sigma::FrameObject packet{};
-	for(auto i = 0; i < 25; ++i) {
+	for(auto i = 0; i < 10; ++i) {
+		Sigma::FrameObject packet{};
 		std::string str("tril");
-		std::strcpy(packet.Content<Sigma::TestPacket>()->message, str.append(std::to_string(i)).c_str());
-		netclient.SendMessage(TEST, TEST, packet);
+		packet << str.append(std::to_string(i));
+		packet.SendMessage(TEST, TEST);
 	}
 
 	// Create hard coded entity ID #1

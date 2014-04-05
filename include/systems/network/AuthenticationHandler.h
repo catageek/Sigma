@@ -53,12 +53,17 @@ namespace Sigma {
 		template<bool isClient = false>
 		static NetworkSystem* GetNetworkSystem() { return netsystem; };
 
+		static void SetHasher(std::unique_ptr<cryptography::VMAC_StreamHasher>&& hasher);
+
+		static void SetAuthState(uint32_t state);
+		static void CheckKeyExchange(const std::list<std::shared_ptr<FrameObject>>& req_list);
+		static void CreateSecureKey(const std::list<std::shared_ptr<FrameObject>>& req_list);
 		static std::shared_ptr<chain_t> GetAuthInitHandler() { return auth_init_handler; };
+
+		int SendSalt();
 	private:
 
 		int RetrieveSalt();
-
-		int SendSalt();
 
 		template<bool isClient>
 		static void SetSystem(NetworkSystem* system) { netsystem = system; };

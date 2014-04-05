@@ -4,13 +4,13 @@
 #include <thread>
 #include <condition_variable>
 #include <mutex>
+#include <algorithm>
 #include "Sigma.h"
 #include "systems/network/IOPoller.h"
 #include "AtomicQueue.hpp"
 #include "systems/network/Protocol.h"
 #include "systems/network/AuthenticationHandler.h"
 #include "netport/include/net/network.h"
-#include "composites/NetworkNode.h"
 
 namespace network {
 	class TCPConnection;
@@ -25,19 +25,25 @@ namespace Sigma {
 	extern template bool FrameObject::Verify_Authenticity<false>();
 
 	namespace network_packet_handler {
+		extern template void INetworkPacketHandler::Process<NET_MSG,AUTH_INIT, false>();
+		extern template void INetworkPacketHandler::Process<NET_MSG,AUTH_SEND_SALT, true>();
+		extern template void INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE, false>();
+		extern template void INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_REPLY, true>();
 		extern template void INetworkPacketHandler::Process<TEST,TEST, false>();
 		extern template void INetworkPacketHandler::Process<TEST,TEST, true>();
 	}
 
 	struct Frame_req {
-		Frame_req(int fd, size_t length_total, vmac_pair* vmac_ptr = nullptr) : reassembled_frame(std::make_shared<FrameObject>(fd, vmac_ptr)),
-			length_total(length_total), length_requested(sizeof(Frame_hdr)), length_got(0) {};
+		Frame_req(int fd, size_t length_total, vmac_pair* vmac_ptr = nullptr) : reassembled_frames_list(),
+			length_total(length_total), length_requested(sizeof(Frame_hdr)), length_got(0) {
+				reassembled_frames_list.emplace_back(new FrameObject(fd, vmac_ptr));
+			};
 
 		// delete copy constructor and assignment for zero-copy guarantee
 		Frame_req(Frame_req&) = delete;
 		Frame_req& operator=(Frame_req&) = delete;
 
-		std::shared_ptr<FrameObject> reassembled_frame;
+		std::list<std::unique_ptr<FrameObject>> reassembled_frames_list;
 		uint32_t length_requested;
 		uint32_t length_got;
 		size_t length_total;
@@ -50,9 +56,13 @@ namespace Sigma {
 
 	class NetworkSystem {
 	public:
-		friend class network_packet_handler::INetworkPacketHandler;
-		friend class Authentication;
-		friend class KeyExchangePacket;
+		friend void Authentication::SetHasher(std::unique_ptr<cryptography::VMAC_StreamHasher>&& hasher);
+		friend void Authentication::SetAuthState(uint32_t state);
+		friend int Authentication::SendSalt();
+		friend void Authentication::CheckKeyExchange(const std::list<std::shared_ptr<FrameObject>>& req_list);
+		friend void Authentication::CreateSecureKey(const std::list<std::shared_ptr<FrameObject>>& req_list);
+		friend std::shared_ptr<FrameObject> KeyExchangePacket::ComputeSessionKey(int fd);
+		friend void FrameObject::SendMessage(unsigned char major, unsigned char minor);
 
 		DLL_EXPORT NetworkSystem() {};
 		DLL_EXPORT virtual ~NetworkSystem() {};
@@ -63,26 +73,8 @@ namespace Sigma {
          * \param ip const char* the address to listen
          *
          */
-		DLL_EXPORT bool Start(const char *ip, unsigned short port);
+		DLL_EXPORT bool Server_Start(const char *ip, unsigned short port);
 		DLL_EXPORT bool Connect(const char *ip, unsigned short port, const std::string& login);
-
-		DLL_EXPORT void SendMessage(unsigned char major, unsigned char minor, FrameObject& packet);
-		DLL_EXPORT void SendUnauthenticatedMessage(unsigned char major, unsigned char minor, FrameObject& packet);
-
-		void SetHasher(std::unique_ptr<cryptography::VMAC_StreamHasher>&& hasher) { this->hasher = std::move(hasher); };
-		cryptography::VMAC_StreamHasher* Hasher() { return hasher.get(); };
-
-		void SetAuthState(uint32_t state) { auth_state = state; };
-		uint32_t AuthState() const { return auth_state; };
-
-		template<bool isClient = false>
-		static AtomicMap<int,char>* GetAuthStateMap() { return &auth_state_map; };
-
-		AtomicQueue<std::shared_ptr<Frame_req>>* GetAuthenticatedRawFrameReqQueue() { return &auth_rawframe_req; };
-		AtomicQueue<std::shared_ptr<FrameObject>>* GetAuthenticatedReassembledFrameQueue() { return &auth_frame_req; };
-		AtomicQueue<std::shared_ptr<FrameObject>>* GetAuthenticatedCheckedFrameQueue() { return &auth_checked_frame_req; };
-		AtomicQueue<std::shared_ptr<Frame_req>>* GetPublicRawFrameReqQueue() { return &pub_rawframe_req; };
-		AtomicQueue<std::shared_ptr<FrameObject>>* GetPublicReassembledFrameQueue() { return &pub_frame_req; };
 
 		template<bool isClient>
 		DLL_EXPORT void SetTCPHandler() {
@@ -92,7 +84,7 @@ namespace Sigma {
 			start = chain_t({
 				// Poll the socket and select the next chain to run
 				[&](){
-					std::this_thread::sleep_for(std::chrono::milliseconds(100));
+//					std::this_thread::sleep_for(std::chrono::milliseconds(100));
 					std::vector<struct kevent> evList(32);
 					LOG_DEBUG << "Polling...";
 					auto nev = Poller()->Poll(evList);
@@ -132,14 +124,16 @@ namespace Sigma {
 								// Request the frame header
 								// queue the task to reassemble the frame
 								LOG_DEBUG << "got unauthenticated frame";
-								NetworkSystem::GetPublicRawFrameReqQueue()->Push(std::make_shared<Frame_req>(fd, evList[i].data));
+								auto max_size = std::min(evList[i].data, 128L);
+								NetworkSystem::GetPublicRawFrameReqQueue()->Push(make_unique<Frame_req>(fd, max_size));
 								a = true;
 							}
 							else {
 								// We stop watching the connection until we got all the frame
 								LOG_DEBUG << "got authenticated frame";
 								// Data received from authenticated client
-								NetworkSystem::GetAuthenticatedRawFrameReqQueue()->Push(std::make_shared<Frame_req>(fd, evList[i].data, reinterpret_cast<vmac_pair*>(evList[i].udata)));
+								auto max_size = std::min(evList[i].data, 1460L);
+								NetworkSystem::GetAuthenticatedRawFrameReqQueue()->Push(make_unique<Frame_req>(fd, max_size, reinterpret_cast<vmac_pair*>(evList[i].udata)));
 								b = true;
 							}
 						}
@@ -153,7 +147,7 @@ namespace Sigma {
 					}
 					else {
 						// Queue a task to wait another event
-						return REPEAT;
+						return REQUEUE;
 					}
 					return STOP;
 				}
@@ -240,7 +234,7 @@ namespace Sigma {
 					if (! req_list) {
 						return STOP;
 					}
-					for(std::shared_ptr<FrameObject>& req : *req_list) {
+					for(std::unique_ptr<FrameObject>& req : *req_list) {
 						if(req->Verify_Authenticity<isClient>()) {
 							NetworkSystem::GetAuthenticatedCheckedFrameQueue()->Push(std::move(req));
 						}
@@ -282,6 +276,7 @@ namespace Sigma {
 
 						default:
 							{
+								LOG_ERROR << "Authenticated switch: closing";
 								CloseConnection(req->GetId(), req->fd);
 							}
 						}
@@ -299,6 +294,21 @@ namespace Sigma {
          */
 		std::unique_ptr<network::TCPConnection> Listener(const char *ip, unsigned short port);
 
+		void SetHasher(std::unique_ptr<cryptography::VMAC_StreamHasher>&& hasher) { this->hasher = std::move(hasher); };
+		cryptography::VMAC_StreamHasher* Hasher() { return hasher.get(); };
+
+		void SetAuthState(uint32_t state) { auth_state = state; };
+		uint32_t AuthState() const { return auth_state; };
+
+		template<bool isClient = false>
+		static AtomicMap<int,char>* GetAuthStateMap() { return &auth_state_map; };
+
+		AtomicQueue<std::unique_ptr<Frame_req>>* GetAuthenticatedRawFrameReqQueue() { return &auth_rawframe_req; };
+		AtomicQueue<std::unique_ptr<FrameObject>>* GetAuthenticatedReassembledFrameQueue() { return &auth_frame_req; };
+		AtomicQueue<std::unique_ptr<FrameObject>>* GetAuthenticatedCheckedFrameQueue() { return &auth_checked_frame_req; };
+		AtomicQueue<std::unique_ptr<Frame_req>>* GetPublicRawFrameReqQueue() { return &pub_rawframe_req; };
+		AtomicQueue<std::unique_ptr<FrameObject>>* GetPublicReassembledFrameQueue() { return &pub_frame_req; };
+
 		IOPoller* Poller() { return &poller; };
 
 		void CloseClientConnection();
@@ -313,11 +323,11 @@ namespace Sigma {
 		chain_t unauthenticated_recv_data;
 		chain_t authenticated_recv_data;
 
-		AtomicQueue<std::shared_ptr<Frame_req>> auth_rawframe_req;				// raw frame request, to be authenticated
-		AtomicQueue<std::shared_ptr<FrameObject>> auth_frame_req;				// reassembled frame request, to be authenticated
-		AtomicQueue<std::shared_ptr<FrameObject>> auth_checked_frame_req;		// reassembled frame request, authenticated
-		AtomicQueue<std::shared_ptr<Frame_req>> pub_rawframe_req;				// raw frame requests
-		AtomicQueue<std::shared_ptr<FrameObject>> pub_frame_req;				// reassembled frame request
+		AtomicQueue<std::unique_ptr<Frame_req>> auth_rawframe_req;				// raw frame request, to be authenticated
+		AtomicQueue<std::unique_ptr<FrameObject>> auth_frame_req;				// reassembled frame request, to be authenticated
+		AtomicQueue<std::unique_ptr<FrameObject>> auth_checked_frame_req;		// reassembled frame request, authenticated
+		AtomicQueue<std::unique_ptr<Frame_req>> pub_rawframe_req;				// raw frame requests
+		AtomicQueue<std::unique_ptr<FrameObject>> pub_frame_req;				// reassembled frame request
 
 		// members for client only
 		static AtomicMap<int,char> auth_state_client;						// state of the connections
@@ -328,53 +338,74 @@ namespace Sigma {
 		std::mutex connecting;
 
 		template<bool isClient>
-		int ReassembleFrame(AtomicQueue<std::shared_ptr<Frame_req>>* input, AtomicQueue<std::shared_ptr<FrameObject>>* output) {
-			std::shared_ptr<Frame_req> req;
-			if(! input->Pop(req)) {
+		int ReassembleFrame(AtomicQueue<std::unique_ptr<Frame_req>>* input, AtomicQueue<std::unique_ptr<FrameObject>>* output) {
+			auto req_list = input->Poll();
+			if (! req_list) {
 				return STOP;
 			}
-			auto target_size = req->length_requested;
-			auto frame = req->reassembled_frame;
-			char* buffer = reinterpret_cast<char*>(frame->FullFrame());
+			auto ret = CONTINUE;
+			LOG_DEBUG << "got " << req_list->size() << " AuthenticatedCheckedDispatchReq events";
+			for (auto& req : *req_list) {
+				auto target_size = req->length_requested;
+				auto frame = req->reassembled_frames_list.back().get();
+				char* buffer = reinterpret_cast<char*>(frame->FullFrame());
 
-			auto current_size = req->length_got;
+				auto current_size = req->length_got;
 
-			auto len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
-			current_size += len;
-			req->length_got = current_size;
-
-			if(current_size == sizeof(Frame_hdr) && target_size == sizeof(Frame_hdr)) {
-				// We now have the length
-				auto length = frame->FullFrame()->length;
-				target_size = frame->FullFrame()->length + sizeof(Frame_hdr);
-				req->length_requested = target_size;
-				frame->Resize<false>(length - sizeof(msg_hdr));
-				buffer = reinterpret_cast<char*>(frame->FullFrame());
 				auto len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
+				if(len < 0) {
+					LOG_ERROR << "Could not read data";
+					continue;
+				}
 				current_size += len;
 				req->length_got = current_size;
-			}
 
-			if (current_size < target_size) {
-				// we put again the request in the queue
-				LOG_DEBUG << "got only " << current_size << " bytes, waiting " << target_size << " bytes";
-				input->Push(std::move(req));
-				return REPEAT;
-			}
-			else {
-				LOG_DEBUG << "Packet of " << current_size << " put in dispatch queue.";
-				output->Push(std::move(frame));
-				if( current_size < req->length_total ) {
-					req->length_total -= current_size;
-					LOG_DEBUG << "Get another packet from fd #" << req->reassembled_frame->fd << " frome same frame.";
-					input->Push(std::make_shared<Frame_req>(req->reassembled_frame->fd, req->length_total, req->reassembled_frame->GetVMACVerifier()));
-					return REPEAT;
+				if(current_size == sizeof(Frame_hdr) && target_size == sizeof(Frame_hdr)) {
+					// We now have the length
+					auto length = frame->FullFrame()->length;
+					target_size = frame->FullFrame()->length + sizeof(Frame_hdr);
+					req->length_requested = target_size;
+					frame->Resize<false>(length - sizeof(msg_hdr));
+					buffer = reinterpret_cast<char*>(frame->FullFrame());
+					auto len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
+					if(len < 0) {
+						LOG_ERROR << "Could not read data";
+						continue;
+					}
+					current_size += len;
+					req->length_got = current_size;
+				}
+
+				if (current_size < target_size) {
+					// we put again the request in the queue
+					LOG_DEBUG << "got only " << current_size << " bytes, waiting " << target_size << " bytes";
+					input->Push(std::move(req));
+					if(ret == CONTINUE) {
+						ret = REPEAT;
+					}
 				}
 				else {
-					poller.Watch<isClient>(req->reassembled_frame->fd);
+					if( current_size < req->length_total ) {
+						LOG_DEBUG << "Packet of " << current_size << " put in frame queue.";
+						req->length_total -= current_size;
+						req->length_got = 0;
+						req->length_requested = sizeof(Frame_hdr);
+						LOG_DEBUG << "Get another packet #" << req->reassembled_frames_list.size() << " from fd #" << frame->fd << " frome same frame.";
+						req->reassembled_frames_list.emplace_back(new FrameObject(frame->fd, frame->GetVMACVerifier()));
+						input->Push(std::move(req));
+						ret = REPEAT;
+					}
+					else {
+						LOG_DEBUG << "Moving " << req->reassembled_frames_list.size() << " messages to queue";
+						output->PushList(std::move(req->reassembled_frames_list));
+						poller.Watch<isClient>(frame->fd);
+						if(ret == REPEAT) {
+							ret = SPLIT;
+						}
+					}
 				}
 			}
-			return CONTINUE;
+			return ret;
 		}
 	};
 }

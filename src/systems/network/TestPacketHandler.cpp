@@ -14,9 +14,9 @@ namespace Sigma {
 				return;
 			}
 			for(auto& req : *req_list) {
-				LOG_DEBUG << "Received authenticated test message with content: " << std::string(req->Content<TestPacket>()->message, 8) << " from id #" << req->GetId();
+				LOG_DEBUG << "Received authenticated test message with content: " << std::string(req->Content<TestPacket>()->message) << " from id #" << req->GetId();
 				Sigma::FrameObject packet{};
-				std::strcpy(packet.Content<Sigma::TestPacket>()->message, std::string(req->Content<TestPacket>()->message, 8).c_str());
+				std::strcpy(packet.Content<Sigma::TestPacket>()->message, std::string(req->Content<TestPacket>()->message).c_str());
 				packet.SendMessage(req->GetId(), TEST, TEST);
 			}
 		}
@@ -28,7 +28,7 @@ namespace Sigma {
 				return;
 			}
 			for(auto& req : *req_list) {
-				LOG_DEBUG << "Received authenticated test message with content: " << std::string(req->Content<TestPacket>()->message, 8);
+				LOG_DEBUG << "Received authenticated test message with content: " << std::string(req->Content<TestPacket>()->message);
 			}
 		}
 	}

@@ -16,6 +16,13 @@ namespace Sigma {
 	template<>
 	void Authentication::SetSystem<true>(NetworkSystem* system) { netsystem_client = system; };
 
+	void Authentication::SetHasher(std::unique_ptr<cryptography::VMAC_StreamHasher>&& hasher) {
+		GetNetworkSystem()->SetHasher(std::move(hasher));
+	}
+
+	void Authentication::SetAuthState(uint32_t state) { GetNetworkSystem()->SetAuthState(state); }
+
+
 	int Authentication::RetrieveSalt() {
 		auto req_list = network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_INIT>()->Poll();
 		if (!req_list) {
@@ -23,7 +30,7 @@ namespace Sigma {
 		}
 		for(auto& req : *req_list) {
 			auto reply = std::make_shared<FrameObject>(req->fd);
-			reply->Resize(sizeof(SendSaltPacket));
+			reply->Resize<false>(sizeof(SendSaltPacket));
 			// TODO : salt is hardcoded !!!
 			auto login = req->Content<AuthInitPacket>()->login;
 			// GetSaltFromsomewhere(reply->Body(), packet->login);
@@ -58,6 +65,47 @@ namespace Sigma {
 		return CONTINUE;
 	}
 
+	void Authentication::CheckKeyExchange(const std::list<std::shared_ptr<FrameObject>>& req_list) {
+		for(auto& req : req_list) {
+			if(! NetworkSystem::GetAuthStateMap()->Count(req->fd) || NetworkSystem::GetAuthStateMap()->At(req->fd) != AUTH_KEY_EXCHANGE) {
+				// This is not the packet expected
+				LOG_DEBUG << "Unexpected packet received with length = " << req->FullFrame()->length;
+				Authentication::GetNetworkSystem()->CloseConnection(req->GetId(), req->fd);
+				continue;
+			}
+			auto reply_packet = req->Content<KeyExchangePacket>()->ComputeSessionKey(req->fd);
+			if(reply_packet) {
+				LOG_DEBUG << "VMAC check passed";
+				reply_packet->SendMessageNoVMAC(req->fd, NET_MSG, AUTH_KEY_REPLY);
+				NetworkSystem::GetAuthStateMap()->At(req->fd) = AUTH_SHARE_KEY;
+				// TODO: Hardcoded entity
+				NetworkNode::AddEntity(1, network::TCPConnection(req->fd, network::NETA_IPv4, network::SCS_CONNECTED));
+				continue;
+			}
+			else {
+				LOG_DEBUG << "VMAC check failed";
+			}
+		}
+	}
+
+	void Authentication::CreateSecureKey(const std::list<std::shared_ptr<FrameObject>>& req_list) {
+		for(auto& req : req_list) {
+			// We received reply
+			auto body = req->Content<KeyReplyPacket>();
+			if (body->VerifyVMAC(Authentication::GetNetworkSystem()->Hasher())) {
+				LOG_DEBUG << "Secure key created";
+				Authentication::GetNetworkSystem()->SetAuthState(AUTH_SHARE_KEY);
+				NetworkSystem::GetAuthStateMap<true>()->Insert(req->fd, AUTH_SHARE_KEY);
+				Authentication::GetNetworkSystem()->is_connected.notify_all();
+			}
+			else {
+				LOG_DEBUG << "VMAC failed";
+				Authentication::GetNetworkSystem()->SetAuthState(AUTH_NONE);
+				Authentication::GetNetworkSystem()->CloseClientConnection();
+				Authentication::GetNetworkSystem()->is_connected.notify_all();
+			}
+		}
+	}
 
 	std::shared_ptr<FrameObject> SendSaltPacket::GetKeyExchangePacket() {
 		auto frame = std::make_shared<FrameObject>();
@@ -158,10 +206,10 @@ namespace Sigma {
 				auto packet = frame->Content<KeyExchangePacket>();
 				// TODO !!!!!
 				auto hasher_key = packet->VMAC_BuildHasher();
-				Authentication::GetNetworkSystem()->SetHasher(packet->VMAC_getHasher(std::move(hasher_key)));
+				Authentication::SetHasher(packet->VMAC_getHasher(std::move(hasher_key)));
 				frame->SendMessageNoVMAC(req->fd, NET_MSG, AUTH_KEY_EXCHANGE);
 				LOG_DEBUG << "Sending keys : " << frame->PacketSize() << " bytes";
-				Authentication::GetNetworkSystem()->SetAuthState(AUTH_KEY_EXCHANGE);
+				Authentication::SetAuthState(AUTH_KEY_EXCHANGE);
 			}
 		}
 
@@ -171,26 +219,7 @@ namespace Sigma {
 			if (!req_list) {
 				return;
 			}
-			for(auto& req : *req_list) {
-				if(! NetworkSystem::GetAuthStateMap()->Count(req->fd) || NetworkSystem::GetAuthStateMap()->At(req->fd) != AUTH_KEY_EXCHANGE) {
-					// This is not the packet expected
-					LOG_DEBUG << "Unexpected packet received with length = " << req->FullFrame()->length;
-					Authentication::GetNetworkSystem()->CloseConnection(req->GetId(), req->fd);
-					continue;
-				}
-				auto reply_packet = req->Content<KeyExchangePacket>()->ComputeSessionKey(req->fd);
-				if(reply_packet) {
-					LOG_DEBUG << "VMAC check passed";
-					reply_packet->SendMessageNoVMAC(req->fd, NET_MSG, AUTH_KEY_REPLY);
-					NetworkSystem::GetAuthStateMap()->At(req->fd) = AUTH_SHARE_KEY;
-					// TODO: Hardcoded entity
-					NetworkNode::AddEntity(1, network::TCPConnection(req->fd, network::NETA_IPv4, network::SCS_CONNECTED));
-					continue;
-				}
-				else {
-					LOG_DEBUG << "VMAC check failed";
-				}
-			}
+			Authentication::CheckKeyExchange(*req_list);
 		}
 
 		template<>
@@ -199,22 +228,7 @@ namespace Sigma {
 			if (!req_list) {
 				return;
 			}
-			for(auto& req : *req_list) {
-				// We received reply
-				auto body = req->Content<KeyReplyPacket>();
-				if (body->VerifyVMAC(Authentication::GetNetworkSystem()->Hasher())) {
-					LOG_DEBUG << "Secure key created";
-					Authentication::GetNetworkSystem()->SetAuthState(AUTH_SHARE_KEY);
-					NetworkSystem::GetAuthStateMap<true>()->Insert(req->fd, AUTH_SHARE_KEY);
-					Authentication::GetNetworkSystem()->is_connected.notify_all();
-				}
-				else {
-					LOG_DEBUG << "VMAC failed";
-					Authentication::GetNetworkSystem()->SetAuthState(AUTH_NONE);
-					Authentication::GetNetworkSystem()->CloseClientConnection();
-					Authentication::GetNetworkSystem()->is_connected.notify_all();
-				}
-			}
+			Authentication::CreateSecureKey(*req_list);
 		}
 	}
 

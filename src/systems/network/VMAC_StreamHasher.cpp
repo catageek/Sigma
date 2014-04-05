@@ -42,7 +42,7 @@ namespace Sigma {
 			++(*_nonce_ptr);
 			_hasher.Resynchronize(_nonce_ptr, _nonce_size);
 			_hasher.CalculateDigest(digest, message, len);
-			Integer vmac, nonc, k, m;
+/*			Integer vmac, nonc, k, m;
 			vmac.Decode(digest, 8);
 			nonc.Decode(_nonce_ptr, _nonce_size);
 			k.Decode(_key->data(), 16);
@@ -52,6 +52,6 @@ namespace Sigma {
 			std::cout << "nonce is " << std::hex << nonc << std::endl;
 			std::cout << "key is " << std::hex << k << std::endl;
 			std::cout << "message is " << std::hex << m << std::endl;
-		}
+*/		}
 	}
 }

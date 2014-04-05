@@ -6,7 +6,8 @@
 #define		STOP		0
 #define 	SPLIT		1
 #define		CONTINUE	2
-#define		REPEAT		3
+#define		REQUEUE		3
+#define		REPEAT		4
 
 #include <chrono>
 #include <functional>
@@ -19,7 +20,7 @@
 namespace Sigma {
 
 	typedef std::function<int(void)> block_t;
-	typedef std::forward_list<block_t> chain_t;
+	typedef std::list<block_t> chain_t;
 	typedef std::forward_list<chain_t> workflow_tree_t;
 	template<class T> struct TaskReq;
 //	typedef std::function<TaskReq*(void)> worker_t;
@@ -72,7 +73,7 @@ namespace Sigma {
 			for(auto& b = block, b_end = block_end; b != b_end; ++b) {
 				auto s = (*b)();
 				switch(s) {
-				case REPEAT:
+				case REQUEUE:
 					LOG_DEBUG << "Requeuing...";
 					// "*this" is now undefined
 					queue_task(std::make_shared<TaskReq<chain_t>>(std::move(*this)));
@@ -82,6 +83,9 @@ namespace Sigma {
 					// Queue a thread to execute this block again, and go to the next block
 					LOG_DEBUG << "Splitting...";
 					queue_task(std::make_shared<TaskReq<chain_t>>(*this));
+				case REPEAT:
+					LOG_DEBUG << "Rewinding...";
+					--b;
 				case CONTINUE:
 					LOG_DEBUG << "Jumping to next block...";
 				default:
@@ -95,7 +99,7 @@ namespace Sigma {
 	private:
 		static std::function<void(std::shared_ptr<TaskReq<chain_t>>)> queue_task;
 		static std::function<void(std::shared_ptr<TaskReq<chain_t>>)> execute_task;
-		std::shared_ptr<chain_t> chain;
+		const std::shared_ptr<chain_t> chain;
 		chain_t::const_iterator block;
 		chain_t::const_iterator block_end;
 	};
@@ -138,6 +142,7 @@ namespace Sigma {
 				}
 			}
 */			taskqueue.push_back(std::forward<U>(task));
+			LOG_DEBUG << "notify";
 			queuecheck.notify_one();
 		}
 

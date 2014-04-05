@@ -16,7 +16,7 @@ namespace Sigma {
 	template<>
 	AtomicMap<int,char>* NetworkSystem::GetAuthStateMap<true>() { return &auth_state_client; };
 
-	bool NetworkSystem::Start(const char *ip, unsigned short port) {
+	bool NetworkSystem::Server_Start(const char *ip, unsigned short port) {
 //		authentication.GetCryptoEngine()->InitializeDH();
 
 		if (! poller.Initialize()) {
@@ -88,7 +88,7 @@ namespace Sigma {
 
 		FrameObject packet{};
 		std::strncpy(packet.Content<AuthInitPacket, char>(), login.c_str(), LOGIN_FIELD_SIZE - 1);
-		SendUnauthenticatedMessage(NET_MSG, AUTH_INIT, packet);
+		packet.SendMessageNoVMAC(cnx.Handle(), NET_MSG, AUTH_INIT);
 		SetAuthState(AUTH_INIT);
 		std::unique_lock<std::mutex> locker(connecting);
 		is_connected.wait_for(locker, std::chrono::seconds(5), [&]() { return (AuthState() == AUTH_SHARE_KEY || AuthState() == AUTH_NONE); });
@@ -97,14 +97,6 @@ namespace Sigma {
 		}
 		CloseClientConnection();
 		return false;
-	}
-
-	void NetworkSystem::SendMessage(unsigned char major, unsigned char minor, FrameObject& packet) {
-		packet.SendMessage(cnx.Handle(), major, minor, Hasher());
-	}
-
-	inline void NetworkSystem::SendUnauthenticatedMessage(unsigned char major, unsigned char minor, FrameObject& packet) {
-		packet.SendMessageNoVMAC(cnx.Handle(), major, minor);
 	}
 
 	void NetworkSystem::CloseClientConnection() {

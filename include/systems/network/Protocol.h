@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <vector>
+#include <cstring>
 #include "systems/network/NetworkPacketHandler.hpp"
 #include "composites/VMAC_Checker.h"
 
@@ -61,7 +62,7 @@ namespace Sigma {
 		template<int Major,int Minor,bool isClient> friend void network_packet_handler::INetworkPacketHandler::Process();
 		friend class NetworkSystem;
 
-		template<class T=Frame_hdr>
+		template<class T=Frame>
 		FrameObject(int fd = -1, vmac_pair* vmac_ptr = nullptr) : fd(fd), packet_size(sizeof(T)), data(std::vector<char>(sizeof(T) + VMAC_SIZE)),
 																	vmac_verifier(vmac_ptr) {};
 
@@ -69,7 +70,14 @@ namespace Sigma {
 		FrameObject(FrameObject&) = delete;
 		FrameObject& operator=(FrameObject&) = delete;
 
+		template<class T>
+		FrameObject& operator<<(const T& in) {
+			append(&in, sizeof(T));
+			return *this;
+		}
+
 		void SendMessage(id_t id, unsigned char major, unsigned char minor);
+		void SendMessage(unsigned char major, unsigned char minor);
 
 		template<bool WITH_VMAC=true>
 		void Resize(size_t new_size) {
@@ -100,15 +108,27 @@ namespace Sigma {
 		int fd;
 	private:
 		char* Body() { return ( data.data() + sizeof(msg_hdr) + sizeof(Frame_hdr)); };
+		uint32_t BodySize() { return (VMAC_tag() - reinterpret_cast<unsigned char*>(Body())); };
 		unsigned char* VMAC_tag() { return reinterpret_cast<unsigned char*>(data.data() + packet_size); };
 		const unsigned char* VMAC_tag() const { return reinterpret_cast<const unsigned char*>(data.data() + packet_size); };
 		void SendMessage(int fd, unsigned char major, unsigned char minor, cryptography::VMAC_StreamHasher* hasher);
 		void SendMessageNoVMAC(int fd, unsigned char major, unsigned char minor);
 
+		void append(const void* in, std::size_t sizeBytes);
+
 		std::vector<char> data;
 		uint32_t packet_size;
 		vmac_pair* const vmac_verifier;
 	};
+
+	template<>
+	void FrameObject::Resize<false>(size_t new_size);
+
+	template<>
+	bool FrameObject::Verify_Authenticity<false>();
+
+	template<>
+	FrameObject& FrameObject::operator<<(const std::string& in);
 }
 
 #endif // PROTOCOL_H_INCLUDED

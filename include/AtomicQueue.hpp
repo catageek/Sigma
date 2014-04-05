@@ -33,6 +33,13 @@ namespace Sigma {
 			mtx.unlock();
 		}
 
+		template<class U>
+		void PushList(U&& list) {
+			mtx.lock();
+			q->splice(q->end(), std::forward<U>(list));
+			mtx.unlock();
+		}
+
 		bool Pop(T& element) {
 			std::unique_lock<std::mutex> locker(mtx);
 			if(q->empty()) {

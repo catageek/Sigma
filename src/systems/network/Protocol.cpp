@@ -1,8 +1,8 @@
 #include "systems/network/Protocol.h"
-#include "Sigma.h"
-#include "netport/include/net/network.h"
+
 #include "composites/NetworkNode.h"
 #include "composites/VMAC_Checker.h"
+#include "systems/network/NetworkSystem.h"
 
 using namespace network;
 
@@ -32,6 +32,14 @@ namespace Sigma {
 		SendMessageNoVMAC(fd, major, minor);
 	}
 
+	void FrameObject::SendMessage(unsigned char major, unsigned char minor) {
+		auto fd = Authentication::GetNetworkSystem()->cnx.Handle();
+		if(fd < 0) {
+			return;
+		}
+		SendMessage(fd, major, minor, Authentication::GetNetworkSystem()->hasher.get());
+	}
+
 	void FrameObject::SendMessageNoVMAC(int fd, unsigned char major, unsigned char minor) {
 		auto header = Header();
 		header->type_major = major;
@@ -44,6 +52,14 @@ namespace Sigma {
 			LOG_ERROR << "could not send frame" ;
 		};
 	}
+
+	void FrameObject::append(const void* in, std::size_t sizeBytes) {
+		LOG_DEBUG << "append " << sizeBytes << " bytes to existing " << BodySize() << " bytes";
+		Resize(BodySize() + sizeBytes);
+		LOG_DEBUG << "append " << sizeBytes << " bytes to existing " << packet_size << " bytes";
+		std::memcpy(VMAC_tag() - sizeBytes, in, sizeBytes);
+	}
+
 
 
 	template<>
@@ -60,6 +76,13 @@ namespace Sigma {
 		}
 		return false;
 	}
+
+	template<>
+	FrameObject& FrameObject::operator<<(const std::string& in) {
+		append(in.c_str(), in.size() + 1);
+		return *this;
+	}
+
 
 	id_t FrameObject::GetId() const { return vmac_verifier->first; }
 
