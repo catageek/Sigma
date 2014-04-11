@@ -27,7 +27,7 @@ namespace Sigma {
 			};
 
 			template<int Major, int Minor>
-			static AtomicQueue<std::shared_ptr<FrameObject>>* GetQueue() { return &PacketQueue<Major,Minor>::input_queue; };
+			static const AtomicQueue<std::shared_ptr<FrameObject>>* const GetQueue() { return &PacketQueue<Major,Minor>::input_queue; };
 
 		};
 	} // namespace network_packet_handler

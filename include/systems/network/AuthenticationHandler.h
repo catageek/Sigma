@@ -8,6 +8,7 @@
 #include "ThreadPool.h"
 #include "systems/network/Crypto.h"
 #include "systems/network/Protocol.h"
+#include <utmpx.h>
 
 #define LOGIN_FIELD_SIZE	16
 #define SALT_SIZE			8
@@ -36,12 +37,44 @@ namespace Sigma {
 		class VMAC_StreamHasher;
 	}
 
+	struct SendSaltPacket {
+		byte salt[SALT_SIZE];								// the stored number used as salt for password
+		std::shared_ptr<FrameObject> GetKeyExchangePacket();
+	};
+
+	struct KeyExchangePacket;
+
+	struct KeyReplyPacket {
+		friend KeyExchangePacket;
+		bool VerifyVMAC() const;
+		bool VerifyVMAC(cryptography::VMAC_StreamHasher* hasher) const;
+		void Compute(const byte* m);
+	private:
+		byte challenge[NONCE2_SIZE];
+		byte vmac[VMAC_SIZE];
+	};
+
+	struct KeyExchangePacket {
+		byte salt[SALT_SIZE];
+		byte alea[ALEA_SIZE];								// Random number used to derive the shared secret
+		byte nonce2[NONCE2_SIZE];							// A random number used as nonce for the VMAC hasher to build
+		byte nonce[NONCE_SIZE];								// a random number used as nonce for the VMAC of this packet
+		byte vmac[VMAC_SIZE];								// VMAC of the message using nonce and shared secret
+
+		std::unique_ptr<cryptography::VMAC_StreamHasher> VMAC_getHasher(std::unique_ptr<std::vector<byte>>&& key) const;
+		std::unique_ptr<std::vector<byte>> VMAC_BuildHasher(const byte* key) const;
+		std::unique_ptr<std::vector<byte>> VMAC_BuildHasher() const;
+		bool VerifyVMAC(const byte* key) const;
+	};
+
 	class Authentication {
+		friend std::shared_ptr<FrameObject> SendSaltPacket::GetKeyExchangePacket();
+		friend std::unique_ptr<std::vector<byte>> KeyExchangePacket::VMAC_BuildHasher() const;
 	public:
 		Authentication() {};
 
 		template<bool isClient>
-		void Initialize(NetworkSystem* netsystem) {
+		void Initialize(NetworkSystem* netsystem) const {
 			Authentication::SetSystem<isClient>(netsystem);
 			auto f = chain_t({
 				std::bind(&Sigma::Authentication::RetrieveSalt, this),
@@ -50,8 +83,10 @@ namespace Sigma {
 			auth_init_handler = std::make_shared<chain_t>(f);
 		}
 
+		static void SetPassword(const std::string& password) { Authentication::password = password; };
+
 		template<bool isClient = false>
-		static NetworkSystem* GetNetworkSystem() { return netsystem; };
+		static NetworkSystem* const GetNetworkSystem() { return netsystem; };
 
 		static void SetHasher(std::unique_ptr<cryptography::VMAC_StreamHasher>&& hasher);
 
@@ -60,10 +95,13 @@ namespace Sigma {
 		static void CreateSecureKey(const std::list<std::shared_ptr<FrameObject>>& req_list);
 		static std::shared_ptr<chain_t> GetAuthInitHandler() { return auth_init_handler; };
 
-		int SendSalt();
+		int SendSalt() const;
 	private:
 
-		int RetrieveSalt();
+		int RetrieveSalt() const;
+		static const std::string& Password() { return password; };
+
+		static unsigned char* GetSecretKey() { return secret_key.data(); };
 
 		template<bool isClient>
 		static void SetSystem(NetworkSystem* system) { netsystem = system; };
@@ -71,36 +109,9 @@ namespace Sigma {
 		static NetworkSystem* netsystem;
 		static NetworkSystem* netsystem_client;
 		static std::shared_ptr<chain_t> auth_init_handler;
-		AtomicQueue<std::shared_ptr<FrameObject>> salt_retrieved;
-	};
-
-	struct KeyExchangePacket;
-
-	struct KeyReplyPacket {
-		friend KeyExchangePacket;
-		bool VerifyVMAC();
-		bool VerifyVMAC(cryptography::VMAC_StreamHasher* hasher);
-	private:
-		void Compute(const byte* m);
-		byte challenge[NONCE2_SIZE];
-		byte vmac[VMAC_SIZE];
-	};
-
-	struct KeyExchangePacket {
-		byte alea[ALEA_SIZE];								// Random number used to derive the shared secret
-		byte nonce2[NONCE2_SIZE];							// A random number used as nonce for the VMAC hasher to build
-		byte nonce[NONCE_SIZE];								// a random number used as nonce for the VMAC of this packet
-		byte vmac[VMAC_SIZE];								// VMAC of the message using nonce and shared secret
-
-		std::shared_ptr<FrameObject> ComputeSessionKey(int fd);
-		std::unique_ptr<cryptography::VMAC_StreamHasher> VMAC_getHasher(std::unique_ptr<std::vector<byte>>&& key) const;
-		std::unique_ptr<std::vector<byte>> VMAC_BuildHasher() const;
-		bool VerifyVMAC();
-	};
-
-	struct SendSaltPacket {
-		byte salt[SALT_SIZE];								// the stored number used as salt for password
-		std::shared_ptr<FrameObject> GetKeyExchangePacket();
+		const AtomicQueue<std::shared_ptr<FrameObject>> salt_retrieved;
+		static std::string password;
+		static std::vector<byte> secret_key;
 	};
 
 	struct AuthInitPacket {

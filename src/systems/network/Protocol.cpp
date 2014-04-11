@@ -54,9 +54,7 @@ namespace Sigma {
 	}
 
 	void FrameObject::append(const void* in, std::size_t sizeBytes) {
-		LOG_DEBUG << "append " << sizeBytes << " bytes to existing " << BodySize() << " bytes";
 		Resize(BodySize() + sizeBytes);
-		LOG_DEBUG << "append " << sizeBytes << " bytes to existing " << packet_size << " bytes";
 		std::memcpy(VMAC_tag() - sizeBytes, in, sizeBytes);
 	}
 
@@ -84,6 +82,6 @@ namespace Sigma {
 	}
 
 
-	id_t FrameObject::GetId() const { return vmac_verifier->first; }
+	id_t FrameObject::GetId() const { return (vmac_verifier ? vmac_verifier->first : 0); }
 
 }

@@ -3,7 +3,7 @@
 #define __LOGGER_H_ 1
 /**
  * \brief Quick and dirty toy logger. Better than nothing
- * 
+ *
  * Requires to call Init, to setup the logger.
  * Change the log level with SetLevel to any Log::LogLevel enumeration value. By default it is at Debug Level.
  * If the output stream is a file, it is recommended to use RAII (opening it at the begin of the main function)
@@ -16,6 +16,7 @@
 #include <string>
 #include <memory>
 #include <cassert>
+#include <mutex>
 
 namespace Log {
 
@@ -29,6 +30,7 @@ namespace Log {
 	private:
 		bool output;    /// Enable output ?
 		LogLevel level; /// Level of the message
+		std::mutex mtxprint;
 
 		/**
 			* \brief Desired Logging level to show.
@@ -76,6 +78,7 @@ namespace Log {
 			* /param level Logging level of the message
 			*/
 		Print( LogLevel level ) : output( level <= log_level ), level(level) {
+			mtxprint.lock();
 			if( output ) {
 				// Last ditch effort to make sure out is valid and set it if it isn't.
 				if (!out) {
@@ -112,6 +115,7 @@ namespace Log {
 				*out << std::endl;
 				out->flush();
 			}
+			mtxprint.unlock();
 		}
 
 		/**

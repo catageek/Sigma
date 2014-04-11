@@ -14,15 +14,17 @@ namespace Sigma {
 	AtomicMap<int,char> NetworkSystem::auth_state_client;						// state of the connections
 
 	template<>
-	AtomicMap<int,char>* NetworkSystem::GetAuthStateMap<true>() { return &auth_state_client; };
+	const AtomicMap<int,char>* const NetworkSystem::GetAuthStateMap<true>() { return &auth_state_client; };
+
+	NetworkSystem::NetworkSystem() throw (std::runtime_error) {
+		if (! poller.Initialize()) {
+			throw std::runtime_error("Could not initialize kqueue !");
+		}
+	};
 
 	bool NetworkSystem::Server_Start(const char *ip, unsigned short port) {
 //		authentication.GetCryptoEngine()->InitializeDH();
 
-		if (! poller.Initialize()) {
-			LOG_ERROR << "Could not initialize kqueue !";
-			return false;
-		}
 		// start to listen
 		auto s = Listener(ip, port);
 		if (! s) {
@@ -61,14 +63,11 @@ namespace Sigma {
 		return std::move(server);
 	}
 
-	bool NetworkSystem::Connect(const char *ip, unsigned short port, const std::string& login) {
-		if (! poller.Initialize()) {
-			LOG_ERROR << "Could not initialize kqueue !";
-			return false;
-		}
-
+	bool NetworkSystem::Connect(const char *ip, unsigned short port, const std::string& login, const std::string& password) {
 		auto tr = std::make_shared<TaskReq<chain_t>>(start);
 		ThreadPool::Queue(tr);
+
+		authentication.SetPassword(password);
 
 		LOG_DEBUG << "Connecting...";
 		cnx = TCPConnection();
@@ -91,7 +90,9 @@ namespace Sigma {
 		packet.SendMessageNoVMAC(cnx.Handle(), NET_MSG, AUTH_INIT);
 		SetAuthState(AUTH_INIT);
 		std::unique_lock<std::mutex> locker(connecting);
-		is_connected.wait_for(locker, std::chrono::seconds(5), [&]() { return (AuthState() == AUTH_SHARE_KEY || AuthState() == AUTH_NONE); });
+		while (AuthState() != AUTH_SHARE_KEY && AuthState() != AUTH_NONE) {
+			is_connected.wait_for(locker, std::chrono::seconds(5), [&]() { return (AuthState() == AUTH_SHARE_KEY || AuthState() == AUTH_NONE); });
+		}
 		if (AuthState() == AUTH_SHARE_KEY) {
 			return true;
 		}
@@ -108,10 +109,17 @@ namespace Sigma {
 		is_connected.notify_all();
 	}
 
-	void NetworkSystem::CloseConnection(const id_t id, const int fd) {
+	void NetworkSystem::CloseConnection(const int fd) const {
 		poller.Delete(fd);
-		TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Close();
+		{
+			std::lock_guard<std::mutex> locker(net_mutex);
+			TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Close();
+		}
 		NetworkSystem::GetAuthStateMap()->Erase(fd);
+	}
+
+	void NetworkSystem::CloseConnection(const int fd, const id_t id) const {
+		CloseConnection(fd);
 		NetworkNode::RemoveEntity(id);
 		VMAC_Checker::RemoveEntity(id);
 	}

@@ -9,9 +9,12 @@ namespace Sigma {
 	NetworkSystem* Authentication::netsystem = nullptr;
 	NetworkSystem* Authentication::netsystem_client = nullptr;
 	std::shared_ptr<chain_t> Authentication::auth_init_handler;
+	std::string Authentication::password;
+	std::vector<byte> Authentication::secret_key(16);
+
 
 	template<>
-	NetworkSystem* Authentication::GetNetworkSystem<true>() { return netsystem_client; };
+	NetworkSystem* const Authentication::GetNetworkSystem<true>() { return netsystem_client; };
 
 	template<>
 	void Authentication::SetSystem<true>(NetworkSystem* system) { netsystem_client = system; };
@@ -23,7 +26,7 @@ namespace Sigma {
 	void Authentication::SetAuthState(uint32_t state) { GetNetworkSystem()->SetAuthState(state); }
 
 
-	int Authentication::RetrieveSalt() {
+	int Authentication::RetrieveSalt() const {
 		auto req_list = network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_INIT>()->Poll();
 		if (!req_list) {
 			return STOP;
@@ -35,14 +38,14 @@ namespace Sigma {
 			auto login = req->Content<AuthInitPacket>()->login;
 			// GetSaltFromsomewhere(reply->Body(), packet->login);
 			std::memcpy(reply->Content<SendSaltPacket,char>(), std::string("abcdefgh").data(), 8);
-			LOG_DEBUG << "Queing salt to send";
+			LOG_DEBUG << "(" << sched_getcpu() << ") Queing salt to send";
 			salt_retrieved.Push(std::move(reply));
 		}
 		return CONTINUE;
 	}
 
 
-	int Authentication::SendSalt() {
+	int Authentication::SendSalt() const {
 		auto req_list = salt_retrieved.Poll();
 		if (!req_list) {
 			return STOP;
@@ -50,9 +53,9 @@ namespace Sigma {
 		for(auto& req : *req_list) {
 			auto reply = req->FullFrame();
 			if (reply) {
+				NetworkSystem::GetAuthStateMap()->Insert(req->fd, AUTH_KEY_EXCHANGE);
 				// send salt
 				req->SendMessageNoVMAC(req->fd, NET_MSG, AUTH_SEND_SALT);
-				NetworkSystem::GetAuthStateMap()->At(req->fd) = AUTH_KEY_EXCHANGE;
 			}
 			else {
 				// close connection
@@ -66,40 +69,62 @@ namespace Sigma {
 	}
 
 	void Authentication::CheckKeyExchange(const std::list<std::shared_ptr<FrameObject>>& req_list) {
+		// server side
 		for(auto& req : req_list) {
-			if(! NetworkSystem::GetAuthStateMap()->Count(req->fd) || NetworkSystem::GetAuthStateMap()->At(req->fd) != AUTH_KEY_EXCHANGE) {
+			if(! NetworkSystem::GetAuthStateMap()->Compare(req->fd, AUTH_KEY_EXCHANGE)) {
 				// This is not the packet expected
-				LOG_DEBUG << "Unexpected packet received with length = " << req->FullFrame()->length;
+				LOG_DEBUG << "(" << sched_getcpu() << ") Unexpected packet received with length = " << req->FullFrame()->length;
 				Authentication::GetNetworkSystem()->CloseConnection(req->GetId(), req->fd);
 				continue;
 			}
-			auto reply_packet = req->Content<KeyExchangePacket>()->ComputeSessionKey(req->fd);
+			// Derive password and salt to get key
+			// TODO : key should be stored and not be computed at runtime. The password is not on the server !
+			// TODO : remove salt from KeyExchangePacket
+			std::vector<byte> vkey(16);
+			auto key = vkey.data();
+			std::string password("secret password");
+			auto recv_packet = req->Content<KeyExchangePacket>();
+			Crypto::PBKDF(key, reinterpret_cast<const byte*>(password.data()), password.size(), recv_packet->salt, SALT_SIZE);
+			if(! recv_packet->VerifyVMAC(key)) {
+				return;
+			}
+			auto checker_key = recv_packet->VMAC_BuildHasher(key);
+			if(! checker_key) {
+				return;
+			}
+
+			auto hasher = VMAC_Checker::AddEntity(1, std::move(checker_key), recv_packet->nonce2, 8);
+			auto reply_packet = std::make_shared<FrameObject>();
+			reply_packet->Content<KeyReplyPacket>()->Compute(recv_packet->nonce2);
+
 			if(reply_packet) {
-				LOG_DEBUG << "VMAC check passed";
-				reply_packet->SendMessageNoVMAC(req->fd, NET_MSG, AUTH_KEY_REPLY);
-				NetworkSystem::GetAuthStateMap()->At(req->fd) = AUTH_SHARE_KEY;
+				LOG_DEBUG << "(" << sched_getcpu() << ") Authentication OK";
+				NetworkSystem::GetAuthStateMap()->Insert(req->fd, AUTH_SHARE_KEY);
 				// TODO: Hardcoded entity
 				NetworkNode::AddEntity(1, network::TCPConnection(req->fd, network::NETA_IPv4, network::SCS_CONNECTED));
+				Authentication::GetNetworkSystem()->Poller()->Create(req->fd, reinterpret_cast<void*>(hasher));
+				reply_packet->SendMessageNoVMAC(req->fd, NET_MSG, AUTH_KEY_REPLY);
 				continue;
 			}
 			else {
-				LOG_DEBUG << "VMAC check failed";
+				LOG_DEBUG << "(" << sched_getcpu() << ") Authentication failed";
 			}
 		}
 	}
 
 	void Authentication::CreateSecureKey(const std::list<std::shared_ptr<FrameObject>>& req_list) {
+		// client side
 		for(auto& req : req_list) {
 			// We received reply
 			auto body = req->Content<KeyReplyPacket>();
 			if (body->VerifyVMAC(Authentication::GetNetworkSystem()->Hasher())) {
-				LOG_DEBUG << "Secure key created";
 				Authentication::GetNetworkSystem()->SetAuthState(AUTH_SHARE_KEY);
 				NetworkSystem::GetAuthStateMap<true>()->Insert(req->fd, AUTH_SHARE_KEY);
+				LOG_DEBUG << "(" << sched_getcpu() << ") Authentication OK";
 				Authentication::GetNetworkSystem()->is_connected.notify_all();
 			}
 			else {
-				LOG_DEBUG << "VMAC failed";
+				LOG_DEBUG << "(" << sched_getcpu() << ") Authentication failed";
 				Authentication::GetNetworkSystem()->SetAuthState(AUTH_NONE);
 				Authentication::GetNetworkSystem()->CloseClientConnection();
 				Authentication::GetNetworkSystem()->is_connected.notify_all();
@@ -108,63 +133,41 @@ namespace Sigma {
 	}
 
 	std::shared_ptr<FrameObject> SendSaltPacket::GetKeyExchangePacket() {
+		// Client received salt
 		auto frame = std::make_shared<FrameObject>();
 		auto packet = frame->Content<KeyExchangePacket>();
-		// TODO : hard coded key
-		byte key[] = "very_secret_key";
+		// Derive password and salt to get key
+		Crypto::PBKDF(Authentication::GetSecretKey(), reinterpret_cast<const byte*>(Authentication::Password().data()), Authentication::Password().size(), salt, SALT_SIZE);
+		std::memcpy(packet->salt, salt, SALT_SIZE);
 		Crypto::GetRandom64(packet->nonce);
 		Crypto::GetRandom128(packet->nonce2);
 		Crypto::GetRandom128(packet->alea);
-		Crypto::VMAC64(packet->vmac, frame->Content<KeyExchangePacket,const byte>(), VMAC_MSG_SIZE, key, packet->nonce);
+		Crypto::VMAC64(packet->vmac, frame->Content<KeyExchangePacket,const byte>(), VMAC_MSG_SIZE, Authentication::GetSecretKey(), packet->nonce);
 		return frame;
 	}
 
-	bool KeyExchangePacket::VerifyVMAC() {
-		// TODO : hard coded key
-		byte key[] = "very_secret_key";
+	bool KeyExchangePacket::VerifyVMAC(const byte* key) const {
+		// server side
 		return Crypto::VMAC_Verify(vmac, reinterpret_cast<const byte*>(this), VMAC_MSG_SIZE, key, nonce);
 	}
 
-	std::shared_ptr<FrameObject> KeyExchangePacket::ComputeSessionKey(int fd) {
-		if(! VerifyVMAC()) {
-			return std::shared_ptr<FrameObject>();
-		}
-		auto checker_key = VMAC_BuildHasher();
-		if(! checker_key) {
-			return std::shared_ptr<FrameObject>();
-		}
-		// TODO: Entity #id is hardcoded
-		auto hasher = VMAC_Checker::AddEntity(1, std::move(checker_key), nonce2, 8);
-		Authentication::GetNetworkSystem()->Poller()->Create(fd, reinterpret_cast<void*>(hasher));
-
-		auto ret = std::make_shared<FrameObject>();
-		ret->Content<KeyReplyPacket>()->Compute(nonce2);
-		return ret;
-	}
-
-
-	std::unique_ptr<std::vector<byte>> KeyExchangePacket::VMAC_BuildHasher() const {
-		// TODO : hard coded key of the player
-		byte key[] = "very_secret_key";
+	std::unique_ptr<std::vector<byte>> KeyExchangePacket::VMAC_BuildHasher(const byte* key) const {
+		// server side
 		// The variable that will hold the hasher key for this session
 		std::unique_ptr<std::vector<byte>> checker_key(new std::vector<byte>(16));
 		// We derive the player key using the alea given by the player
 		Crypto::VMAC128(checker_key->data(), alea, ALEA_SIZE, key, nonce2);
 		return std::move(checker_key);
-/*		// We store the key in the component
-		LOG_DEBUG << "Inserting checker";
-		if (fd <0) {
-			// client hasher is stored under id #1
-			VMAC_Checker::AddEntity(1, std::move(checker_key), nonce2, 8);
-		}
-		else {
-			// server
-			// TODO : entity ID is hardcoded
-			auto hasher = VMAC_Checker::AddEntity(1, std::move(checker_key), nonce2, 8);
-			NetworkSystem::Poller()->Create(fd, reinterpret_cast<void*>(hasher));
-		}
-		return true;
-*/	}
+	}
+
+	std::unique_ptr<std::vector<byte>> KeyExchangePacket::VMAC_BuildHasher() const {
+		// client side
+		// The variable that will hold the hasher key for this session
+		std::unique_ptr<std::vector<byte>> checker_key(new std::vector<byte>(16));
+		// We derive the player key using the alea given by the player
+		Crypto::VMAC128(checker_key->data(), alea, ALEA_SIZE, Authentication::GetSecretKey(), nonce2);
+		return std::move(checker_key);
+	}
 
 	std::unique_ptr<cryptography::VMAC_StreamHasher> KeyExchangePacket::VMAC_getHasher(std::unique_ptr<std::vector<byte>>&& key) const {
 		return std::unique_ptr<cryptography::VMAC_StreamHasher>(new cryptography::VMAC_StreamHasher(std::move(key), nonce2, 8));
@@ -176,12 +179,12 @@ namespace Sigma {
 		VMAC_Checker::Digest(1, vmac, challenge, NONCE2_SIZE);
 	}
 
-	bool KeyReplyPacket::VerifyVMAC() {
+	bool KeyReplyPacket::VerifyVMAC() const {
 		// TODO : entity ID is hardcoded
 		return VMAC_Checker::Verify(1, vmac, challenge, NONCE2_SIZE);
 	}
 
-	bool KeyReplyPacket::VerifyVMAC(cryptography::VMAC_StreamHasher* hasher) {
+	bool KeyReplyPacket::VerifyVMAC(cryptography::VMAC_StreamHasher* hasher) const {
 		return hasher->Verify(vmac, challenge, NONCE2_SIZE);
 	}
 
@@ -200,16 +203,16 @@ namespace Sigma {
 			for(auto& req : *req_list) {
 				// We must send keys
 				auto body = req->Content<SendSaltPacket>();
-				LOG_DEBUG << "salt received : " << std::string(reinterpret_cast<const char*>(body->salt), 8);
+				LOG_DEBUG << "(" << sched_getcpu() << ") salt received : " << std::string(reinterpret_cast<const char*>(body->salt), 8);
 	//								Authentication::SetSalt(std::unique_ptr<std::vector<unsigned char>>(m->body.get()));
 				auto frame = body->GetKeyExchangePacket();
 				auto packet = frame->Content<KeyExchangePacket>();
 				// TODO !!!!!
 				auto hasher_key = packet->VMAC_BuildHasher();
 				Authentication::SetHasher(packet->VMAC_getHasher(std::move(hasher_key)));
-				frame->SendMessageNoVMAC(req->fd, NET_MSG, AUTH_KEY_EXCHANGE);
-				LOG_DEBUG << "Sending keys : " << frame->PacketSize() << " bytes";
+				LOG_DEBUG << "(" << sched_getcpu() << ") Sending keys : " << frame->PacketSize() << " bytes";
 				Authentication::SetAuthState(AUTH_KEY_EXCHANGE);
+				frame->SendMessageNoVMAC(req->fd, NET_MSG, AUTH_KEY_EXCHANGE);
 			}
 		}
 

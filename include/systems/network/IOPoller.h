@@ -19,21 +19,26 @@ namespace Sigma {
 			return kqhandle != -1;
 		}
 
-		void Create(int fd, void* udata = NULL);
+		IOPoller(IOPoller&) = delete;
+		IOPoller& operator=(IOPoller&) = delete;
 
-		void CreatePermanent(int fd);
+		void Create(const int fd) const;
+
+		void Create(const int fd, void* udata) const;
+
+		void CreatePermanent(int fd) const;
 
 		template<bool isClient>
-		void Watch(int fd) {};
+		void Watch(const int fd) const {};
 
-		void Unwatch(int fd);
+		void Unwatch(const int fd) const;
 
-		void Delete(int fd);
+		void Delete(const int fd) const;
 
-		int Poll(std::vector<struct kevent>& v);
+		int Poll(std::vector<struct kevent>& v) const;
 	private:
 		class IOEvent;			// An IO event
-		int kqhandle;			// the handle of the kqueue
+		mutable int kqhandle;			// the handle of the kqueue
 		const timespec ts{};	// for non-blocking kevent
 	};
 
@@ -44,13 +49,22 @@ namespace Sigma {
 		IOEvent(int fd, int filter, int operation, void* udata = NULL) { EV_SET(&ke, fd, filter, operation, 0, 5, udata); };
 		virtual ~IOEvent() {};
 
-		const struct kevent* getStruct() { return &ke; };
+		const struct kevent* getStruct() const { return &ke; };
 
 	private:
 		struct kevent ke;
 	};
 
-	inline void IOPoller::Create(int fd, void* udata) {
+	inline void IOPoller::Create(int fd) const {
+		IOEvent e(fd, EVFILT_READ, EV_ADD|EV_DISPATCH, NULL);
+		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
+		if (i == -1) {
+			perror ("The following error occurred in Watch(): ");
+			return;
+		}
+	}
+
+	inline void IOPoller::Create(int fd, void* udata) const {
 		IOEvent e(fd, EVFILT_READ, EV_ADD|EV_DISPATCH, udata);
 		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
 		if (i == -1) {
@@ -59,7 +73,7 @@ namespace Sigma {
 		}
 	}
 
-	inline void IOPoller::CreatePermanent(int fd) {
+	inline void IOPoller::CreatePermanent(int fd) const {
 		IOEvent e(fd, EVFILT_READ, EV_ADD);
 		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
 		if (i == -1) {
@@ -69,8 +83,9 @@ namespace Sigma {
 	}
 
 	template<>
-	inline void IOPoller::Watch<false>(int fd) {
+	inline void IOPoller::Watch<false>(int fd) const {
 		IOEvent e(fd, EVFILT_READ, EV_ENABLE);
+		LOG_DEBUG << "Watching...";
 		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
 		if (i == -1) {
 			perror ("The following error occurred in Watch(): ");
@@ -78,19 +93,23 @@ namespace Sigma {
 		}
 	}
 
-	inline void IOPoller::Unwatch(int fd) {
+	inline void IOPoller::Unwatch(int fd) const {
 		IOEvent e(fd, EVFILT_READ, EV_DISABLE);
 		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
 	}
 
-	inline void IOPoller::Delete(int fd) {
+	inline void IOPoller::Delete(int fd) const {
 		IOEvent e(fd, EVFILT_READ, EV_DELETE);
 		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
 	}
 
-	inline int IOPoller::Poll(std::vector<struct kevent>& v) {
+	inline int IOPoller::Poll(std::vector<struct kevent>& v) const {
 //		return kevent(kqhandle, NULL, 0, v.data(), v.size(), &ts);
-		return kevent(kqhandle, NULL, 0, v.data(), v.size(), NULL);
+		auto i = kevent(kqhandle, NULL, 0, v.data(), v.size(), NULL);
+		if (i == -1) {
+			perror ("The following error occurred in Watch(): ");
+		}
+		return i;
 	}
 }
 

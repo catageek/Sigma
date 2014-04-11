@@ -36,8 +36,8 @@ namespace Sigma {
 
 		virtual bool operator==(const TaskQueueElement& tqe) const = 0;
 
-		virtual void RunTask() = 0;
-		std::chrono::steady_clock::time_point timestamp;
+		virtual void RunTask() const = 0;
+		const std::chrono::steady_clock::time_point timestamp;
 	};
 
 	template<class T>
@@ -49,11 +49,11 @@ namespace Sigma {
 			return false;
 		}
 
-		void RunTask() override {
+		void RunTask() const override {
 			funct();
 		}
 	private:
-		T funct;
+		const T funct;
 	};
 
 	template<>
@@ -69,25 +69,21 @@ namespace Sigma {
 			return rhs && rhs->block == this->block;
 		}
 
-		void RunTask() override {
-			for(auto& b = block, b_end = block_end; b != b_end; ++b) {
+		void RunTask() const override {
+			for(auto b = block, b_end = block_end; b != b_end; ++b) {
 				auto s = (*b)();
 				switch(s) {
 				case REQUEUE:
-					LOG_DEBUG << "Requeuing...";
 					// "*this" is now undefined
 					queue_task(std::make_shared<TaskReq<chain_t>>(std::move(*this)));
 				case STOP:
 					return;
 				case SPLIT:
 					// Queue a thread to execute this block again, and go to the next block
-					LOG_DEBUG << "Splitting...";
 					queue_task(std::make_shared<TaskReq<chain_t>>(*this));
 				case REPEAT:
-					LOG_DEBUG << "Rewinding...";
 					--b;
 				case CONTINUE:
-					LOG_DEBUG << "Jumping to next block...";
 				default:
 					break;
 				}
@@ -100,8 +96,8 @@ namespace Sigma {
 		static std::function<void(std::shared_ptr<TaskReq<chain_t>>)> queue_task;
 		static std::function<void(std::shared_ptr<TaskReq<chain_t>>)> execute_task;
 		const std::shared_ptr<chain_t> chain;
-		chain_t::const_iterator block;
-		chain_t::const_iterator block_end;
+		const chain_t::const_iterator block;
+		const chain_t::const_iterator block_end;
 	};
 
 	class ThreadPool {
@@ -142,7 +138,6 @@ namespace Sigma {
 				}
 			}
 */			taskqueue.push_back(std::forward<U>(task));
-			LOG_DEBUG << "notify";
 			queuecheck.notify_one();
 		}
 
@@ -152,7 +147,6 @@ namespace Sigma {
 		static int counter;
 		static std::mutex m_queue;
 		static std::mutex m_count;
-		static std::mutex m_print;
 		static std::condition_variable queuecheck;
 	};
 }

@@ -15,19 +15,19 @@ namespace Sigma {
 	public:
 		AtomicMap() : q(atomic_map<K,T>(new std::map<K,T>)) {};
 
-		void Insert(const K& key, const T& element) {
+		void Insert(const K& key, const T& element) const {
 			mtx.lock();
-			q->insert(std::make_pair(key, element));
+			(*q)[key] = element;
 			mtx.unlock();
 		}
 
-		bool Erase(const K& key) {
+		bool Erase(const K& key) const {
 			mtx.lock();
 			q->erase(key);
 			mtx.unlock();
 		}
 
-		bool Pop(const K& key, T& element) {
+		bool Pop(const K& key, T& element) const {
 			mtx.lock();
 			if(q->count(key)) {
 				element = std::move(q->at(key));
@@ -39,17 +39,28 @@ namespace Sigma {
 			return false;
 		}
 
-		T& At(const K& key) const {
-			return q->at(key);
+		T At(const K& key) const {
+			mtx.lock();
+			auto ret = q->at(key);
+			mtx.unlock();
+			return ret;
 		}
 
 		size_t Count(const K& key) const {
-			return q->count(key);
+			mtx.lock();
+			auto ret = q->count(key);
+			mtx.unlock();
+			return ret;
+		}
+
+		bool Compare(const K& key, const T& element) const {
+			std::lock_guard<std::mutex> locker(mtx);
+			return q->count(key) && (q->at(key) == element);
 		}
 
 	private:
-		atomic_map<K,T> q;
-		std::mutex mtx;
+		const atomic_map<K,T> q;
+		mutable std::mutex mtx;
 	};
 }
 

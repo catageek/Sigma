@@ -22,6 +22,7 @@ namespace Sigma {
 
 		static void GetRandom64(byte* nonce);
 		static void GetRandom128(byte* nonce);
+		static void PBKDF(byte* derived, const byte* password, size_t password_len, const byte* salt, size_t salt_len);
 
 	private:
 

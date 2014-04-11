@@ -1,10 +1,8 @@
 #include "systems/network/Crypto.h"
-#include "crypto++/integer.h"
+//#include "crypto++/integer.h"
 #include "crypto++/vmac.h"
-#include <vector>
-#include <memory>
-#include <cstring>
-#include <iostream>
+#include "crypto++/sha.h"
+#include "crypto++/pwdbased.h"
 
 namespace Sigma {
 /*	void Crypto::InitializeDH() {
@@ -77,4 +75,16 @@ namespace Sigma {
 		hasher.SetKey(key, 16, MakeParameters(Name::IV(), ConstByteArrayParameter(nonce, 8), false));
 		return hasher.VerifyDigest(digest, message, len);
 	}
+
+	void Crypto::PBKDF(byte* derived, const byte* password, size_t password_len, const byte* salt, size_t salt_len) {
+		CryptoPP::PKCS5_PBKDF2_HMAC<CryptoPP::SHA256>().DeriveKey(derived, 16, 0, password, password_len, salt, salt_len, 1024);
+/*		Integer d, p, s;
+		d.Decode(derived, 16);
+		p.Decode(password, password_len);
+		s.Decode(salt, salt_len);
+		std::cout << ">>Derive password" << std::endl;
+		std::cout << "derived key is " << std::hex << d << std::endl;
+		std::cout << "password is " << std::hex << p << std::endl;
+		std::cout << "salt is " << std::hex << s << std::endl;
+*/	}
 }

@@ -15,11 +15,11 @@ namespace Sigma {
 	public:
 		AtomicQueue() : q(atomic_queue<T>(new std::list<T>)) {};
 
-		atomic_queue<T> Poll() {
+		atomic_queue<T> Poll() const {
+			mtx.lock();
 			if (! q->size()) {
 				return atomic_queue<T>();
 			}
-			mtx.lock();
 			auto ret = std::move(q);
 			q.reset(new std::list<T>());
 			mtx.unlock();
@@ -27,20 +27,20 @@ namespace Sigma {
 		}
 
 		template<class U>
-		void Push(U&& element) {
+		void Push(U&& element) const {
 			mtx.lock();
 			q->push_back(std::forward<U>(element));
 			mtx.unlock();
 		}
 
 		template<class U>
-		void PushList(U&& list) {
+		void PushList(U&& list) const {
 			mtx.lock();
 			q->splice(q->end(), std::forward<U>(list));
 			mtx.unlock();
 		}
 
-		bool Pop(T& element) {
+		bool Pop(T& element) const {
 			std::unique_lock<std::mutex> locker(mtx);
 			if(q->empty()) {
 				return false;
@@ -51,12 +51,13 @@ namespace Sigma {
 		}
 
 		bool Empty() const {
+			std::unique_lock<std::mutex> locker(mtx);
 			return q->empty();
 		}
 
 	private:
-		atomic_queue<T> q;
-		std::mutex mtx;
+		mutable atomic_queue<T> q;
+		mutable std::mutex mtx;
 	};
 }
 
