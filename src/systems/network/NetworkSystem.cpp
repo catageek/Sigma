@@ -10,11 +10,8 @@
 using namespace network;
 
 namespace Sigma {
-	AtomicMap<int,char> NetworkSystem::auth_state_map;						// state of the connections
-	AtomicMap<int,char> NetworkSystem::auth_state_client;						// state of the connections
-
-	template<>
-	const AtomicMap<int,char>* const NetworkSystem::GetAuthStateMap<true>() { return &auth_state_client; };
+	extern template void NetworkSystem::CloseConnection<true>(const FrameObject* frame);
+	extern template	void NetworkSystem::CloseConnection<false>(const FrameObject* frame);
 
 	NetworkSystem::NetworkSystem() throw (std::runtime_error) {
 		if (! poller.Initialize()) {
@@ -83,7 +80,7 @@ namespace Sigma {
 			LOG_ERROR << "Could not connect to server !";
 			return false;
 		}
-		poller.CreatePermanent(cnx.Handle());
+		poller.Create(cnx.Handle(), reinterpret_cast<void*>(new ConnectionData(AUTH_INIT)));
 
 		FrameObject packet{};
 		std::strncpy(packet.Content<AuthInitPacket, char>(), login.c_str(), LOGIN_FIELD_SIZE - 1);
@@ -104,23 +101,20 @@ namespace Sigma {
 		auto fd = cnx.Handle();
 		//poller.Delete(fd);
 		cnx.Close();
-		NetworkSystem::GetAuthStateMap<true>()->Erase(fd);
 		SetAuthState(AUTH_NONE);
 		is_connected.notify_all();
 	}
 
 	void NetworkSystem::CloseConnection(const int fd) const {
 		poller.Delete(fd);
-		{
-			std::lock_guard<std::mutex> locker(net_mutex);
-			TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Close();
-		}
-		NetworkSystem::GetAuthStateMap()->Erase(fd);
+		TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Close();
+		SetAuthState(AUTH_NONE);
+		is_connected.notify_all();
 	}
 
-	void NetworkSystem::CloseConnection(const int fd, const id_t id) const {
+	void NetworkSystem::CloseConnection(const int fd, const ConnectionData* cx_data) const {
 		CloseConnection(fd);
-		NetworkNode::RemoveEntity(id);
-		VMAC_Checker::RemoveEntity(id);
+		NetworkNode::RemoveEntity(cx_data->Id());
+		delete cx_data;
 	}
 }

@@ -1,7 +1,6 @@
 #include "systems/network/Protocol.h"
 
 #include "composites/NetworkNode.h"
-#include "composites/VMAC_Checker.h"
 #include "systems/network/NetworkSystem.h"
 
 using namespace network;
@@ -18,7 +17,7 @@ namespace Sigma {
 		FullFrame()->length = packet_size - sizeof(Frame_hdr) + VMAC_SIZE;
 		// The VMAC Hasher has been put under id #1 for client
 		hasher->CalculateDigest(VMAC_tag(), reinterpret_cast<const unsigned char*>(data.data()), packet_size);
-		LOG_DEBUG << "Bytes to send (with VMAC): " << packet_size + VMAC_SIZE;
+//		LOG_DEBUG << "Bytes to send (with VMAC): " << packet_size + VMAC_SIZE;
 		if (TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Send(reinterpret_cast<char*>(FullFrame()), packet_size + VMAC_SIZE) <= 0) {
 			LOG_ERROR << "could not send authenticated frame" ;
 		};
@@ -47,7 +46,7 @@ namespace Sigma {
 		FullFrame()->length = packet_size - sizeof(Frame_hdr);
 
 		FullFrame()->length = packet_size - sizeof(Frame_hdr);
-		LOG_DEBUG << "Bytes to send (no VMAC): " << packet_size;
+//		LOG_DEBUG << "Bytes to send (no VMAC): " << packet_size;
 		if (TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Send(reinterpret_cast<char*>(FullFrame()), packet_size) <= 0) {
 			LOG_ERROR << "could not send frame" ;
 		};
@@ -70,7 +69,7 @@ namespace Sigma {
 	bool FrameObject::Verify_Authenticity<false>() {
 		if(Header()->flags & (1 << HAS_VMAC_TAG)) {
 			packet_size -= VMAC_SIZE;
-			return vmac_verifier->second.Verify(VMAC_tag(), reinterpret_cast<const unsigned char*>(data.data()), packet_size);
+			return cx_data->Hasher()->Verify(VMAC_tag(), reinterpret_cast<const unsigned char*>(data.data()), packet_size);
 		}
 		return false;
 	}
@@ -82,6 +81,6 @@ namespace Sigma {
 	}
 
 
-	id_t FrameObject::GetId() const { return (vmac_verifier ? vmac_verifier->first : 0); }
+	id_t FrameObject::GetId() const { return (cx_data ? cx_data->Id() : 0); }
 
 }

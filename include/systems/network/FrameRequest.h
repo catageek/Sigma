@@ -7,9 +7,9 @@
 namespace Sigma {
 	class Frame_req {
 	public:
-		Frame_req(int fd, size_t length_total, vmac_pair* vmac_ptr = nullptr) : reassembled_frames_list(),
+		Frame_req(int fd, size_t length_total, ConnectionData* cxdata_ptr) : reassembled_frames_list(),
 			length_total(length_total), length_requested(sizeof(Frame_hdr)), length_got(0) {
-				reassembled_frames_list.emplace_back(new FrameObject(fd, vmac_ptr));
+				reassembled_frames_list.emplace_back(new FrameObject(fd, cxdata_ptr));
 			};
 
 		// delete copy constructor and assignment for zero-copy guarantee

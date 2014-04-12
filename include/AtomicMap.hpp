@@ -5,6 +5,7 @@
 #include <atomic>
 #include <map>
 #include <memory>
+#include <iostream>
 
 namespace Sigma {
 	template<class K, class T>
@@ -17,6 +18,7 @@ namespace Sigma {
 
 		void Insert(const K& key, const T& element) const {
 			mtx.lock();
+			std::cout << "inserting " << (int) element << "in auth map"<< std::endl;
 			(*q)[key] = element;
 			mtx.unlock();
 		}

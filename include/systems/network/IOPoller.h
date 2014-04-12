@@ -28,8 +28,7 @@ namespace Sigma {
 
 		void CreatePermanent(int fd) const;
 
-		template<bool isClient>
-		void Watch(const int fd) const {};
+		void Watch(const int fd) const;
 
 		void Unwatch(const int fd) const;
 
@@ -82,10 +81,9 @@ namespace Sigma {
 		}
 	}
 
-	template<>
-	inline void IOPoller::Watch<false>(int fd) const {
+	inline void IOPoller::Watch(int fd) const {
 		IOEvent e(fd, EVFILT_READ, EV_ENABLE);
-		LOG_DEBUG << "Watching...";
+//		LOG_DEBUG << "Watching...";
 		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);
 		if (i == -1) {
 			perror ("The following error occurred in Watch(): ");

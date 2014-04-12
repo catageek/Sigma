@@ -6,7 +6,7 @@
 #include <vector>
 #include <cstring>
 #include "systems/network/NetworkPacketHandler.hpp"
-#include "composites/VMAC_Checker.h"
+#include "systems/network/ConnectionData.h"
 
 #define VMAC_SIZE			8
 
@@ -63,8 +63,10 @@ namespace Sigma {
 		friend class NetworkSystem;
 
 		template<class T=Frame>
-		FrameObject(int fd = -1, vmac_pair* vmac_ptr = nullptr) : fd(fd), packet_size(sizeof(T)), data(std::vector<char>(sizeof(T) + VMAC_SIZE)),
-																	vmac_verifier(vmac_ptr) {};
+		FrameObject(int fd = -1, const ConnectionData* const cxdata_ptr = nullptr) : fd(fd), packet_size(sizeof(T)), data(std::vector<char>(sizeof(T) + VMAC_SIZE)),
+																	cx_data(cxdata_ptr) {};
+
+		virtual ~FrameObject() {};
 
 		// Copy constructor and assignment are deleted to remain zero-copy
 		FrameObject(FrameObject&) = delete;
@@ -100,7 +102,7 @@ namespace Sigma {
 
 		id_t GetId() const;
 
-		vmac_pair* GetVMACVerifier() const { return vmac_verifier; };
+		const ConnectionData* const CxData() const { return cx_data; };
 
 		msg_hdr* Header() { return reinterpret_cast<msg_hdr*>(data.data() + sizeof(Frame_hdr)); };
 		Frame_hdr* FullFrame() { return reinterpret_cast<Frame_hdr*>(data.data()); };
@@ -118,7 +120,7 @@ namespace Sigma {
 
 		std::vector<char> data;
 		uint32_t packet_size;
-		vmac_pair* const vmac_verifier;
+		const ConnectionData* const cx_data;
 	};
 
 	template<>

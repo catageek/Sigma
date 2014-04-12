@@ -74,19 +74,19 @@ namespace Sigma {
 				[&](){
 //					std::this_thread::sleep_for(std::chrono::milliseconds(100));
 					std::vector<struct kevent> evList(32);
-					LOG_DEBUG << "(" << sched_getcpu() << ") Polling...";
+//					LOG_DEBUG << "(" << sched_getcpu() << ") Polling...";
 					auto nev = Poller()->Poll(evList);
 					if (nev < 0) {
 						LOG_ERROR << "(" << sched_getcpu() << ") Error when polling event";
 					}
-					LOG_DEBUG << "(" << sched_getcpu() << ") got " << nev << " kqueue events";
+//					LOG_DEBUG << "(" << sched_getcpu() << ") got " << nev << " kqueue events";
 					bool a = false, b = false;
 					for (auto i=0; i<nev; i++) {
 						auto fd = evList[i].ident;
 						if (evList[i].flags & EV_EOF) {
-							LOG_DEBUG << "(" << sched_getcpu() << ") disconnect " << fd << " with " << evList[i].fflags << " code";
+							LOG_DEBUG << "(" << sched_getcpu() << ") disconnect " << fd << " with " << evList[i].fflags << " code, " << evList[i].data << " bytes left.";
 							if(evList[i].udata) {
-								CloseConnection(fd, reinterpret_cast<vmac_pair*>(evList[i].udata)->first);
+								CloseConnection(fd, reinterpret_cast<ConnectionData*>(evList[i].udata));
 							}
 							else {
 								CloseConnection(fd);
@@ -105,28 +105,32 @@ namespace Sigma {
 								continue;
 							}
 							c.SetNonBlocking(true);
-							poller.Create(c.Handle());
+							poller.Create(c.Handle(), reinterpret_cast<void*>(new ConnectionData(AUTH_INIT)));
 							LOG_DEBUG << "connect " << c.Handle();
 	//						c.Send("welcome!\n");
-							NetworkSystem::GetAuthStateMap<isClient>()->Insert(c.Handle(), AUTH_INIT);
+
 						}
 						else if (evList[i].flags & EVFILT_READ) {
 							// Data received
-							if (! NetworkSystem::GetAuthStateMap<isClient>()->Compare(fd, AUTH_SHARE_KEY)) {
+							auto cx_data = reinterpret_cast<ConnectionData*>(evList[i].udata);
+							if (! cx_data->TryLockConnection()) {
+								continue;
+							}
+							if (! cx_data || ! cx_data->CompareAuthState(AUTH_SHARE_KEY)) {
 								// Data received, not authenticated
 								// Request the frame header
 								// queue the task to reassemble the frame
-								LOG_DEBUG << "(" << sched_getcpu() << ") got unauthenticated frame of " << evList[i].data << " bytes";
+//								LOG_DEBUG << "(" << sched_getcpu() << ") got unauthenticated frame of " << evList[i].data << " bytes";
 								auto max_size = std::min(evList[i].data, 128L);
-								GetPublicRawFrameReqQueue()->Push(make_unique<Frame_req>(fd, max_size));
+								GetPublicRawFrameReqQueue()->Push(make_unique<Frame_req>(fd, max_size, cx_data));
 								a = true;
 							}
 							else {
 								// We stop watching the connection until we got all the frame
-								LOG_DEBUG << "(" << sched_getcpu() << ") got authenticated frame of " << evList[i].data << " bytes";
+//								LOG_DEBUG << "(" << sched_getcpu() << ") got authenticated frame of " << evList[i].data << " bytes";
 								// Data received from authenticated client
 								auto max_size = std::min(evList[i].data, 1460L);
-								GetAuthenticatedRawFrameReqQueue()->Push(make_unique<Frame_req>(fd, max_size, reinterpret_cast<vmac_pair*>(evList[i].udata)));
+								GetAuthenticatedRawFrameReqQueue()->Push(make_unique<Frame_req>(fd, max_size, cx_data));
 								b = true;
 							}
 						}
@@ -154,13 +158,13 @@ namespace Sigma {
 					if (! req_list) {
 						return STOP;
 					}
-					LOG_DEBUG << "(" << sched_getcpu() << ") got " << req_list->size() << " PublicDispatchReq events";
+//					LOG_DEBUG << "(" << sched_getcpu() << ") got " << req_list->size() << " PublicDispatchReq events";
 					for (auto& req : *req_list) {
 						msg_hdr* header = req->Header();
 						auto major = header->type_major;
 						if (IS_RESTRICTED(major)) {
 							LOG_DEBUG << "restricted";
-							CloseConnection(req->fd, req->GetId());
+							CloseConnection<isClient>(req.get());
 							break;
 						}
 						switch(major) {
@@ -191,15 +195,15 @@ namespace Sigma {
 									default:
 										{
 											LOG_DEBUG << "(" << sched_getcpu() << ") invalid minor code, closing";
-											CloseConnection(req->fd, req->GetId());
+											CloseConnection<isClient>(req.get());
 										}
 								}
 								break;
 							}
 						default:
 							{
-								LOG_DEBUG << "(" << sched_getcpu() << ") invalid major code, closing";
-								CloseConnection(req->fd, req->GetId());
+								LOG_DEBUG << "(" << sched_getcpu() << ") invalid major code in unauthenticated chain, packet of " << req->PacketSize() << " bytes, closing";
+								CloseConnection<isClient>(req.get());
 							}
 						}
 					}
@@ -227,7 +231,7 @@ namespace Sigma {
 					if (! req_list) {
 						return STOP;
 					}
-					LOG_DEBUG << "(" << sched_getcpu() << ") got " << req_list->size() << " AuthenticatedCheckedDispatchReq events";
+//					LOG_DEBUG << "(" << sched_getcpu() << ") got " << req_list->size() << " AuthenticatedCheckedDispatchReq events";
 					for (auto& req : *req_list) {
 						msg_hdr* header = req->Header();
 						auto major = header->type_major;
@@ -246,7 +250,7 @@ namespace Sigma {
 									default:
 										{
 											LOG_ERROR << "(" << sched_getcpu() << ") TEST: closing";
-											CloseConnection(req->fd, req->GetId());
+											CloseConnection<isClient>(req.get());
 										}
 								}
 								break;
@@ -255,7 +259,7 @@ namespace Sigma {
 						default:
 							{
 								LOG_ERROR << "(" << sched_getcpu() << ") Authenticated switch: closing";
-								CloseConnection(req->fd, req->GetId());
+								CloseConnection<isClient>(req.get());
 							}
 						}
 					}
@@ -275,11 +279,8 @@ namespace Sigma {
 		void SetHasher(std::unique_ptr<cryptography::VMAC_StreamHasher>&& hasher) { this->hasher = std::move(hasher); };
 		cryptography::VMAC_StreamHasher* Hasher() { return hasher.get(); };
 
-		void SetAuthState(uint32_t state) { auth_state.store(state); };
+		void SetAuthState(uint32_t state) const { auth_state.store(state); };
 		uint32_t AuthState() const { return auth_state.load(); };
-
-		template<bool isClient = false>
-		static const AtomicMap<int,char>* const GetAuthStateMap() { return &auth_state_map; };
 
 		const AtomicQueue<std::unique_ptr<Frame_req>>* const GetAuthenticatedRawFrameReqQueue() { return &auth_rawframe_req; };
 		const AtomicQueue<std::unique_ptr<FrameObject>>* const GetAuthenticatedCheckedFrameQueue() { return &auth_checked_frame_req; };
@@ -288,15 +289,17 @@ namespace Sigma {
 
 		const IOPoller* const Poller() { return &poller; };
 
+		// specialization in network.cpp
+		template<bool isClient>
+		void CloseConnection(const FrameObject* frame);
+
 		void CloseClientConnection();
-		void CloseConnection(int fd, id_t id) const;
-		void CloseConnection(int fd) const;
+		void CloseConnection(const int fd, const ConnectionData* cx_data) const;
+		void CloseConnection(const int fd) const;
 
 		int ssocket;											// the listening socket
 		mutable IOPoller poller;
 		const Authentication authentication;
-		static AtomicMap<int,char> auth_state_map;						// state of the connections
-		mutable std::mutex net_mutex;
 
 		chain_t start;
 		chain_t unauthenticated_recv_data;
@@ -308,11 +311,10 @@ namespace Sigma {
 		const AtomicQueue<std::unique_ptr<FrameObject>> pub_frame_req;				// reassembled frame request
 
 		// members for client only
-		static AtomicMap<int,char> auth_state_client;						// state of the connections
 		std::unique_ptr<cryptography::VMAC_StreamHasher> hasher;
-		std::atomic_uint_least32_t auth_state;
+		mutable std::atomic_uint_least32_t auth_state;
 		network::TCPConnection cnx;
-		std::condition_variable is_connected;
+		mutable std::condition_variable is_connected;
 		std::mutex connecting;
 
 		template<bool isClient, bool hasVMAC>
@@ -322,18 +324,16 @@ namespace Sigma {
 				return STOP;
 			}
 			auto ret = CONTINUE;
-			LOG_DEBUG << "(" << sched_getcpu() << ") got " << req_list->size() << " Reassemble events";
+//			LOG_DEBUG << "(" << sched_getcpu() << ") got " << req_list->size() << " Reassemble events";
 			for (auto& req : *req_list) {
 				auto target_size = req->length_requested;
-				LOG_DEBUG << "(" << sched_getcpu() << ")  Reassembling " << target_size << " bytes";
+//				LOG_DEBUG << "(" << sched_getcpu() << ")  Reassembling " << target_size << " bytes";
 				auto frame = req->reassembled_frames_list.back().get();
 				char* buffer = reinterpret_cast<char*>(frame->FullFrame());
 
 				auto current_size = req->length_got;
 				int len;
 
-				// lock mutex: Only 1 thread from here
-				net_mutex.lock();
 				len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
 				if(len < 0) {
 					LOG_ERROR << "(" << sched_getcpu() << ") Could not read data";
@@ -346,15 +346,13 @@ namespace Sigma {
 					// We now have the length
 					auto length = frame->FullFrame()->length;
 					target_size = frame->FullFrame()->length + sizeof(Frame_hdr);
-					LOG_DEBUG << "(" << sched_getcpu() << ")  Completing message for a total of " << target_size << " bytes";
+//					LOG_DEBUG << "(" << sched_getcpu() << ")  Completing message to " << target_size << " bytes in a frame of " << req->length_total << " bytes";
 					req->length_requested = target_size;
 					frame->Resize<false>(length - sizeof(msg_hdr));
 					buffer = reinterpret_cast<char*>(frame->FullFrame());
 					len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
 					if(len < 0) {
 						LOG_ERROR << "(" << sched_getcpu() << ") Could not read data";
-						// release mutex
-						net_mutex.unlock();
 						continue;
 					}
 					current_size += len;
@@ -362,10 +360,8 @@ namespace Sigma {
 				}
 
 				if (current_size < target_size) {
-					// release mutex
-					net_mutex.unlock();
 					// we put again the request in the queue
-					LOG_DEBUG << "(" << sched_getcpu() << ") got only " << current_size << " bytes, waiting " << target_size << " bytes";
+//					LOG_DEBUG << "(" << sched_getcpu() << ") got only " << current_size << " bytes, waiting " << target_size << " bytes";
 					input->Push(std::move(req));
 					if(ret == CONTINUE) {
 						ret = REPEAT;
@@ -373,31 +369,26 @@ namespace Sigma {
 				}
 				else {
 					if( current_size < req->length_total ) {
-						// release mutex
-						net_mutex.unlock();
-						LOG_DEBUG << "(" << sched_getcpu() << ") Packet of " << current_size << " put in frame queue.";
+//						LOG_DEBUG << "(" << sched_getcpu() << ") Packet of " << current_size << " put in frame queue.";
 						req->length_total -= current_size;
 						req->length_got = 0;
 						req->length_requested = sizeof(Frame_hdr);
-						LOG_DEBUG << "(" << sched_getcpu() << ") Get another packet #" << req->reassembled_frames_list.size() << " from fd #" << frame->fd << " frome same frame.";
+//						LOG_DEBUG << "(" << sched_getcpu() << ") Get another packet #" << req->reassembled_frames_list.size() << " from fd #" << frame->fd << " frome same frame.";
 
-						req->reassembled_frames_list.emplace_back(new FrameObject(frame->fd, frame->GetVMACVerifier()));
+						req->reassembled_frames_list.emplace_back(new FrameObject(frame->fd, frame->CxData()));
 						input->Push(std::move(req));
 						ret = REPEAT;
 					}
 					else {
 						if (! req->CheckVMAC<isClient, hasVMAC>()) {
-							// release mutex
-							net_mutex.unlock();
 							LOG_DEBUG << "(" << sched_getcpu() << ") Dropping all frames and closing (VMAC check failed)";
 							CloseConnection(frame->fd);
 							continue;
 						}
-						// release mutex
-						net_mutex.unlock();
-						poller.Watch<isClient>(frame->fd);
+						frame->CxData()->ReleaseConnection();
+						poller.Watch(frame->fd);
 
-						LOG_DEBUG << "(" << sched_getcpu() << ") Moving " << req->reassembled_frames_list.size() << " messages with a total of " << req->length_got << " bytes to queue";
+//						LOG_DEBUG << "(" << sched_getcpu() << ") Moving " << req->reassembled_frames_list.size() << " messages with a total of " << req->length_got << " bytes to queue";
 						output->PushList(std::move(req->reassembled_frames_list));
 						if(ret == REPEAT) {
 							ret = SPLIT;

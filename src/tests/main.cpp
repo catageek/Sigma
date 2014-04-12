@@ -109,13 +109,18 @@ int main(int argCount, char **argValues) {
 //	netclient.Start();
 	Sigma::ThreadPool::Initialize(5);
 	netclient.SetTCPHandler<true>();
+
+	if(! netclient.Connect("127.0.0.1", 7777, "my_login", "bad password")) {
+		LOG_DEBUG << "Wrong password does not pass";
+	};
+
 	if(! netclient.Connect("127.0.0.1", 7777, "my_login", "secret password")) {
 		LOG_ERROR << "Could not authenticate on server.";
 	};
 
-	for(auto i = 0; i < 10; ++i) {
+	for(auto i = 0; i < 100; ++i) {
 		Sigma::FrameObject packet{};
-		std::string str("trillek...");
+		std::string str("This is a big very big text ! #");
 		packet << str.append(std::to_string(i));
 //		packet << i;
 		packet.SendMessage(TEST, TEST);

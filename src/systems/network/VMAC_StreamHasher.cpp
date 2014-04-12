@@ -1,7 +1,7 @@
 #include "systems/network/VMAC_StreamHasher.h"
 
-#include <cstring>
-#include <iostream>
+//#include <cstring>
+//#include <iostream>
 #include "crypto++/vmac.h"
 #include "crypto++/osrng.h"
 #include "crypto++/dh.h"
