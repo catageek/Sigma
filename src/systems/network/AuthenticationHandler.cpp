@@ -34,7 +34,7 @@ namespace Sigma {
 			return STOP;
 		}
 		for(auto& req : *req_list) {
-			auto reply = std::make_shared<FrameObject>(req->fd);
+			auto reply = std::make_shared<FrameObject>(req->FileDescriptor());
 			reply->Resize<false>(sizeof(SendSaltPacket));
 			// TODO : salt is hardcoded !!!
 			auto login = req->Content<AuthInitPacket>()->login;
@@ -103,7 +103,7 @@ namespace Sigma {
 			cx_data->SetAuthState(AUTH_SHARE_KEY);
 			// TODO: Hardcoded entity
 			NetworkNode::AddEntity(1, network::TCPConnection(req->fd, network::NETA_IPv4, network::SCS_CONNECTED));
-			Authentication::GetNetworkSystem()->Poller()->Create(req->fd, reinterpret_cast<void*>(cx_data));
+			Authentication::GetNetworkSystem()->Poller()->Create(req->FileDescriptor(), reinterpret_cast<void*>(cx_data));
 			reply_packet->SendMessageNoVMAC(req->fd, NET_MSG, AUTH_KEY_REPLY);
 		}
 	}
@@ -199,8 +199,8 @@ namespace Sigma {
 				auto packet = frame->Content<KeyExchangePacket>();
 				// TODO !!!!!
 				auto hasher_key = packet->VMAC_BuildHasher();
+				LOG_DEBUG << "(" << sched_getcpu() << ") Sending keys : " << frame->PacketSize() << " bytes, key is " << std::hex << (uint64_t) hasher_key->data();
 				Authentication::SetHasher(packet->VMAC_getHasher(hasher_key));
-				LOG_DEBUG << "(" << sched_getcpu() << ") Sending keys : " << frame->PacketSize() << " bytes";
 				Authentication::SetAuthState(AUTH_KEY_EXCHANGE);
 				req->CxData()->SetAuthState(AUTH_KEY_EXCHANGE);
 				frame->SendMessageNoVMAC(req->fd, NET_MSG, AUTH_KEY_EXCHANGE);

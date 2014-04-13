@@ -23,9 +23,10 @@ namespace Sigma {
 
 	using namespace network;
 
-	extern template bool FrameObject::Verify_Authenticity<false>();
-	extern template	bool Frame_req::CheckVMAC<false, false>() const;
+	extern template bool Frame_req::CheckVMAC<false, false>() const;
+	extern template bool Frame_req::CheckVMAC<false, true>() const;
 	extern template bool Frame_req::CheckVMAC<true, false>() const;
+	extern template bool Frame_req::CheckVMAC<true, true>() const;
 
 	namespace network_packet_handler {
 		extern template void INetworkPacketHandler::Process<NET_MSG,AUTH_INIT, false>();
@@ -113,10 +114,10 @@ namespace Sigma {
 						else if (evList[i].flags & EVFILT_READ) {
 							// Data received
 							auto cx_data = reinterpret_cast<ConnectionData*>(evList[i].udata);
-							if (! cx_data->TryLockConnection()) {
+							if (! cx_data || ! cx_data->TryLockConnection()) {
 								continue;
 							}
-							if (! cx_data || ! cx_data->CompareAuthState(AUTH_SHARE_KEY)) {
+							if (! cx_data->CompareAuthState(AUTH_SHARE_KEY)) {
 								// Data received, not authenticated
 								// Request the frame header
 								// queue the task to reassemble the frame
@@ -334,7 +335,7 @@ namespace Sigma {
 				auto current_size = req->length_got;
 				int len;
 
-				len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
+				len = TCPConnection(req->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
 				if(len < 0) {
 					LOG_ERROR << "(" << sched_getcpu() << ") Could not read data";
 					continue;
@@ -342,7 +343,7 @@ namespace Sigma {
 				current_size += len;
 				req->length_got = current_size;
 
-				if(current_size == sizeof(Frame_hdr) && target_size == sizeof(Frame_hdr)) {
+				if (current_size == sizeof(Frame_hdr) && target_size == sizeof(Frame_hdr)) {
 					// We now have the length
 					auto length = frame->FullFrame()->length;
 					target_size = frame->FullFrame()->length + sizeof(Frame_hdr);
@@ -350,8 +351,8 @@ namespace Sigma {
 					req->length_requested = target_size;
 					frame->Resize<false>(length - sizeof(msg_hdr));
 					buffer = reinterpret_cast<char*>(frame->FullFrame());
-					len = TCPConnection(frame->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
-					if(len < 0) {
+					len = TCPConnection(req->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
+					if (len < 0) {
 						LOG_ERROR << "(" << sched_getcpu() << ") Could not read data";
 						continue;
 					}
@@ -360,35 +361,48 @@ namespace Sigma {
 				}
 
 				if (current_size < target_size) {
+					// missing bytes
+					if (req->HasExpired()) {
+						// Frame reassembly is stopped after 3 seconds if message is uncomplete
+						continue;
+					}
 					// we put again the request in the queue
 //					LOG_DEBUG << "(" << sched_getcpu() << ") got only " << current_size << " bytes, waiting " << target_size << " bytes";
 					input->Push(std::move(req));
-					if(ret == CONTINUE) {
+					if (ret == CONTINUE) {
 						ret = REPEAT;
 					}
 				}
 				else {
-					if( current_size < req->length_total ) {
+					if ( current_size < req->length_total ) {
+						// message retrieved, but there are still bytes to read
 //						LOG_DEBUG << "(" << sched_getcpu() << ") Packet of " << current_size << " put in frame queue.";
 						req->length_total -= current_size;
 						req->length_got = 0;
 						req->length_requested = sizeof(Frame_hdr);
 //						LOG_DEBUG << "(" << sched_getcpu() << ") Get another packet #" << req->reassembled_frames_list.size() << " from fd #" << frame->fd << " frome same frame.";
 
-						req->reassembled_frames_list.emplace_back(new FrameObject(frame->fd, frame->CxData()));
+						req->reassembled_frames_list.emplace_back(new FrameObject(req->fd, req->CxData()));
+						// reset the timestamp to now
+						req->UpdateTimestamp();
+						// requeue the frame request for next message
 						input->Push(std::move(req));
 						ret = REPEAT;
 					}
 					else {
+						// request completed
+						// check integrity
 						if (! req->CheckVMAC<isClient, hasVMAC>()) {
 							LOG_DEBUG << "(" << sched_getcpu() << ") Dropping all frames and closing (VMAC check failed)";
-							CloseConnection(frame->fd);
+							CloseConnection(req->fd);
 							continue;
 						}
-						frame->CxData()->ReleaseConnection();
-						poller.Watch(frame->fd);
+						// We allow again events on this socket
+						req->CxData()->ReleaseConnection();
+						poller.Watch(req->fd);
 
 //						LOG_DEBUG << "(" << sched_getcpu() << ") Moving " << req->reassembled_frames_list.size() << " messages with a total of " << req->length_got << " bytes to queue";
+						// Put the messages in the queue for next step
 						output->PushList(std::move(req->reassembled_frames_list));
 						if(ret == REPEAT) {
 							ret = SPLIT;

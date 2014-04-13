@@ -79,16 +79,16 @@ namespace Sigma {
 		CryptoPP::VMAC<CryptoPP::AES, 128> hasher;
 		hasher.SetKey(key, 16, MakeParameters(Name::IV(), ConstByteArrayParameter(nonce, 16), false));
 		hasher.CalculateDigest(digest, message, len);
-/*			Integer vmac, nonc, k, m;
-			vmac.Decode(digest, 16);
-			nonc.Decode(nonce, 8);
-			k.Decode(key, 16);
-			m.Decode(message, len);
-			std::cout << ">>DIGEST VMAC128" << std::endl;
-			std::cout << "VMAC is " << std::hex << vmac << std::endl;
-			std::cout << "nonce is " << std::hex << nonc << std::endl;
-			std::cout << "key is " << std::hex << k << std::endl;
-			std::cout << "message is " << std::hex << m << std::endl;
+/*		Integer vmac, nonc, k, m;
+		vmac.Decode(digest, 16);
+		nonc.Decode(nonce, 8);
+		k.Decode(key, 16);
+		m.Decode(message, len);
+		std::cout << ">>DIGEST VMAC128" << std::endl;
+		std::cout << "VMAC is " << std::hex << vmac << std::endl;
+		std::cout << "nonce is " << std::hex << nonc << std::endl;
+		std::cout << "key is " << std::hex << k << std::endl;
+		std::cout << "message is " << std::hex << m << std::endl;
 */	}
 
 	bool Crypto::VMAC_Verify(const byte* digest, const byte* message, size_t len, const byte* key, const byte* nonce) {

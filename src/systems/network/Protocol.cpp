@@ -66,21 +66,12 @@ namespace Sigma {
 	}
 
 	template<>
-	bool FrameObject::Verify_Authenticity<false>() {
-		if(Header()->flags & (1 << HAS_VMAC_TAG)) {
-			packet_size -= VMAC_SIZE;
-			return cx_data->Hasher()->Verify(VMAC_tag(), reinterpret_cast<const unsigned char*>(data.data()), packet_size);
-		}
-		return false;
-	}
-
-	template<>
 	FrameObject& FrameObject::operator<<(const std::string& in) {
 		append(in.c_str(), in.size() + 1);
 		return *this;
 	}
 
 
-	id_t FrameObject::GetId() const { return (cx_data ? cx_data->Id() : 0); }
+	id_t FrameObject::GetId() const { return cx_data->Id(); }
 
 }

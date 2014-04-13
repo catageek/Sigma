@@ -1,6 +1,6 @@
 #include "systems/network/VMAC_StreamHasher.h"
 
-//#include <cstring>
+#include <cstring>
 //#include <iostream>
 #include "crypto++/vmac.h"
 #include "crypto++/osrng.h"
@@ -20,8 +20,6 @@ namespace Sigma {
 			std::vector<byte> nonce(_nonce_size);
 			std::lock_guard<std::mutex> locker(vmac_mutex);
 			++_nonce;
-			_nonce.Encode(nonce.data(), _nonce_size);
-			_hasher.Resynchronize(nonce.data(), _nonce_size);
 /*			Integer vmac, nonc, k, m;
 			vmac.Decode(digest, 8);
 			nonc.Decode(nonce.data(), _nonce_size);
@@ -32,7 +30,9 @@ namespace Sigma {
 			std::cout << "nonce is " << std::hex << nonc << std::endl;
 			std::cout << "key is " << std::hex << k << std::endl;
 			std::cout << "message is " << std::hex << m << std::endl;
-*/			return _hasher.VerifyDigest(digest, message, len);
+*/			_nonce.Encode(nonce.data(), _nonce_size);
+			_hasher.Resynchronize(nonce.data(), _nonce_size);
+			return _hasher.VerifyDigest(digest, message, len);
 		}
 
 		void VMAC_StreamHasher::CalculateDigest(byte* digest, const byte* message, int len) const {
