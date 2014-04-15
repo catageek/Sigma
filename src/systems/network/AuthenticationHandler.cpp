@@ -12,8 +12,8 @@ namespace Sigma {
 	std::string Authentication::password;
 	std::vector<byte> Authentication::secret_key(16);
 
-	extern template void NetworkSystem::CloseConnection<true>(const FrameObject* frame);
-	extern template	void NetworkSystem::CloseConnection<false>(const FrameObject* frame);
+	extern template void NetworkSystem::CloseConnection<true>(const FrameObject* frame) const;
+	extern template	void NetworkSystem::CloseConnection<false>(const FrameObject* frame) const;
 
 	template<>
 	NetworkSystem* const Authentication::GetNetworkSystem<true>() { return netsystem_client; };
@@ -199,7 +199,7 @@ namespace Sigma {
 				auto packet = frame->Content<KeyExchangePacket>();
 				// TODO !!!!!
 				auto hasher_key = packet->VMAC_BuildHasher();
-				LOG_DEBUG << "(" << sched_getcpu() << ") Sending keys : " << frame->PacketSize() << " bytes, key is " << std::hex << (uint64_t) hasher_key->data();
+//				LOG_DEBUG << "(" << sched_getcpu() << ") Sending keys : " << frame->PacketSize() << " bytes, key is " << std::hex << (uint64_t) hasher_key->data();
 				Authentication::SetHasher(packet->VMAC_getHasher(hasher_key));
 				Authentication::SetAuthState(AUTH_KEY_EXCHANGE);
 				req->CxData()->SetAuthState(AUTH_KEY_EXCHANGE);

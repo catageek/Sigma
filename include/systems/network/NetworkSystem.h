@@ -90,7 +90,7 @@ namespace Sigma {
 								CloseConnection(fd, reinterpret_cast<ConnectionData*>(evList[i].udata));
 							}
 							else {
-								CloseConnection(fd);
+								RemoveConnection(fd);
 							}
 							continue;
 						}
@@ -292,11 +292,11 @@ namespace Sigma {
 
 		// specialization in network.cpp
 		template<bool isClient>
-		void CloseConnection(const FrameObject* frame);
+		void CloseConnection(const FrameObject* frame) const;
 
-		void CloseClientConnection();
+		void RemoveClientConnection() const;
 		void CloseConnection(const int fd, const ConnectionData* cx_data) const;
-		void CloseConnection(const int fd) const;
+		void RemoveConnection(const int fd) const;
 
 		int ssocket;											// the listening socket
 		mutable IOPoller poller;
@@ -340,6 +340,12 @@ namespace Sigma {
 					LOG_ERROR << "(" << sched_getcpu() << ") Could not read data";
 					continue;
 				}
+
+				if (len > 65535) {
+					LOG_DEBUG << "(" << sched_getcpu() << ") Packet length exceeding 65535 bytes. closing";
+					CloseConnection<isClient>(frame);
+					continue;
+				}
 				current_size += len;
 				req->length_got = current_size;
 
@@ -364,6 +370,8 @@ namespace Sigma {
 					// missing bytes
 					if (req->HasExpired()) {
 						// Frame reassembly is stopped after 3 seconds if message is uncomplete
+						LOG_DEBUG << "(" << sched_getcpu() << ") Dropping all frames and closing (timeout)";
+						CloseConnection<isClient>(frame);
 						continue;
 					}
 					// we put again the request in the queue
@@ -394,7 +402,7 @@ namespace Sigma {
 						// check integrity
 						if (! req->CheckVMAC<isClient, hasVMAC>()) {
 							LOG_DEBUG << "(" << sched_getcpu() << ") Dropping all frames and closing (VMAC check failed)";
-							CloseConnection(req->fd);
+							CloseConnection<isClient>(frame);
 							continue;
 						}
 						// We allow again events on this socket

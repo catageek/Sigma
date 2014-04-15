@@ -3,14 +3,14 @@
 
 namespace Sigma {
 	template<>
-	void NetworkSystem::CloseConnection<true>(const FrameObject* frame) {
+	void NetworkSystem::CloseConnection<true>(const FrameObject* frame) const {
 		delete frame->CxData();
-		CloseClientConnection();
+		RemoveClientConnection();
 	}
 
 	template<>
-	void NetworkSystem::CloseConnection<false>(const FrameObject* frame) {
-		CloseConnection(frame->fd);
+	void NetworkSystem::CloseConnection<false>(const FrameObject* frame) const {
+		RemoveConnection(frame->fd);
 		delete frame->CxData();
 	}
 }

@@ -26,7 +26,8 @@ namespace Sigma {
          */
 		ConnectionData(const id_t id, std::unique_ptr<std::vector<byte>>&& key, const byte* nonce, int nonce_size)
 						: _auth_state(0), _id(id), _hasher(std::move(key), nonce, nonce_size) {};
-		virtual ~ConnectionData() {};
+
+		virtual ~ConnectionData() { _cx_mutex.unlock(); };
 
 		// Copy functions are deleted
 		ConnectionData(ConnectionData&) = delete;

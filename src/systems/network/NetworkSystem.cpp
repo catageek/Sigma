@@ -10,8 +10,8 @@
 using namespace network;
 
 namespace Sigma {
-	extern template void NetworkSystem::CloseConnection<true>(const FrameObject* frame);
-	extern template	void NetworkSystem::CloseConnection<false>(const FrameObject* frame);
+	extern template void NetworkSystem::CloseConnection<true>(const FrameObject* frame) const;
+	extern template	void NetworkSystem::CloseConnection<false>(const FrameObject* frame) const;
 
 	NetworkSystem::NetworkSystem() throw (std::runtime_error) {
 		if (! poller.Initialize()) {
@@ -93,19 +93,20 @@ namespace Sigma {
 		if (AuthState() == AUTH_SHARE_KEY) {
 			return true;
 		}
-		CloseClientConnection();
 		return false;
 	}
 
-	void NetworkSystem::CloseClientConnection() {
+	void NetworkSystem::RemoveClientConnection() const {
 		auto fd = cnx.Handle();
-		//poller.Delete(fd);
-		cnx.Close();
+		poller.Delete(fd);
+		// TODO : make NetPort thread-safe
+//		cnx.Close();
+		TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Close();
 		SetAuthState(AUTH_NONE);
 		is_connected.notify_all();
 	}
 
-	void NetworkSystem::CloseConnection(const int fd) const {
+	void NetworkSystem::RemoveConnection(const int fd) const {
 		poller.Delete(fd);
 		TCPConnection(fd, NETA_IPv4, SCS_CONNECTED).Close();
 		SetAuthState(AUTH_NONE);
@@ -113,7 +114,7 @@ namespace Sigma {
 	}
 
 	void NetworkSystem::CloseConnection(const int fd, const ConnectionData* cx_data) const {
-		CloseConnection(fd);
+		RemoveConnection(fd);
 		NetworkNode::RemoveEntity(cx_data->Id());
 		delete cx_data;
 	}
