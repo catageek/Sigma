@@ -7,12 +7,13 @@
 namespace Sigma {
 	namespace network_packet_handler {
 		template<>
-		void INetworkPacketHandler::Process<TEST,TEST, false>() {
+		template<>
+		void INetworkPacketHandler<SERVER>::Process<TEST,TEST>() {
 			auto req_list = GetQueue<TEST,TEST>()->Poll();
-			if (!req_list) {
+			if (req_list.empty()) {
 				return;
 			}
-			for(auto& req : *req_list) {
+			for(auto& req : req_list) {
 				LOG_DEBUG << "Received authenticated test message with content: " << std::string(req->Content<TestPacket>()->message) << " from id #" << req->GetId();
 				Sigma::FrameObject packet{};
 				packet << std::string(req->Content<TestPacket>()->message);
@@ -21,12 +22,13 @@ namespace Sigma {
 		}
 
 		template<>
-		void INetworkPacketHandler::Process<TEST,TEST, true>() {
+		template<>
+		void INetworkPacketHandler<CLIENT>::Process<TEST,TEST>() {
 			auto req_list = GetQueue<TEST,TEST>()->Poll();
-			if (!req_list) {
+			if (req_list.empty()) {
 				return;
 			}
-			for(auto& req : *req_list) {
+			for(auto& req : req_list) {
 				LOG_DEBUG << "Received authenticated test message with content: " << std::string(req->Content<TestPacket>()->message);
 			}
 		}

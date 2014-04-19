@@ -5,6 +5,7 @@
 #include "entities/BulletMover.h"
 #include "SCParser.h"
 #include "systems/network/NetworkSystem.h"
+#include "systems/network/Esign_StreamHasher.h"
 #include "OS.h"
 
 #ifdef _WIN32
@@ -38,8 +39,21 @@ int main(int argCount, char **argValues) {
 	// Start to listen network //
 	/////////////////////////////
 
+	Sigma::cryptography::Esign_StreamHasher esign_hasher;
+	esign_hasher.GenerateKeys();
+	esign_hasher.Initialize();
+	std::vector<unsigned char> signature(esign_hasher.MaxSignatureLength());
+	auto key =esign_hasher.PublicKey();
+	LOG_DEBUG << "key length:" << key->size();
+	netsys.SetServerPublicKey(std::move(key));
+	std::string message = "a";
+	for (auto i = 0; i < 100; ++i) {
+		esign_hasher.Sign(signature.data(), reinterpret_cast<const unsigned char*>(message.data()), message.size());
+		message.append("a");
+	}
+
 	Sigma::ThreadPool::Initialize(5);
-	netsys.SetTCPHandler<false>();
+	netsys.SetTCPHandler<Sigma::SERVER>();
 	netsys.Server_Start("127.0.0.1", 7777);
 
 

@@ -31,15 +31,10 @@ namespace Sigma {
 
         /** \brief Verify the VMAC tag of all the frames reassembled
          *
-         * parameter bool isClient: true for client, false for server
-		 * parameter bool hasVMAC: true if the frames have VMAC, false to disable check.
-		 *
-		 * This template is specialized in .cpp file
-         *
          * \return bool true if the VMAC tag was successfully verified
          *
          */
-		template<bool isClient,bool hasVMAC>
+        template<TagType T>
 		bool CheckVMAC() const;
 
         /** \brief Return a pointer on the object storing data on the connection

@@ -2,7 +2,7 @@
 #define CONNECTIONDATA_H_INCLUDED
 
 #include <atomic>
-#include "systems/network/VMAC_StreamHasher.h"
+#include "systems/network/Network.h"
 
 namespace Sigma {
     /** \brief This object is attached to each socket
@@ -24,8 +24,10 @@ namespace Sigma {
          * \param nonce_size int the size of the nonce
          *
          */
-		ConnectionData(const id_t id, std::unique_ptr<std::vector<byte>>&& key, const byte* nonce, int nonce_size)
-						: _auth_state(0), _id(id), _hasher(std::move(key), nonce, nonce_size) {};
+		ConnectionData(const id_t id,
+                        std::unique_ptr<std::function<void(unsigned char*,const unsigned char*,size_t)>>&& hasher,
+                        std::unique_ptr<std::function<bool(const unsigned char*,const unsigned char*,size_t)>>&& verifier)
+						    : _auth_state(0), _id(id), _hasher(std::move(hasher)), _verifier(std::move(verifier)) {};
 
 		virtual ~ConnectionData() { _cx_mutex.unlock(); };
 
@@ -73,12 +75,19 @@ namespace Sigma {
          */
 		void ReleaseConnection() const { _cx_mutex.unlock(); };
 
-        /** \brief Return the VMAC hasher associated to this socket
+        /** \brief Return the hasher associated to this socket
          *
-         * \return const cryptography::VMAC_StreamHasher* const the hasher
+         * \return const std::function<void(unsigned char*,const unsigned char*,size_t)>* const
          *
          */
-		const cryptography::VMAC_StreamHasher* const Hasher() const { return &_hasher; };
+		const std::function<void(unsigned char*,const unsigned char*,size_t)>* const Hasher() const { return _hasher.get(); };
+
+        /** \brief Return the verifier associated to this socket
+         *
+         * \return const std::function<bool(const unsigned char*,const unsigned char*,size_t)>* const
+         *
+         */
+		const std::function<bool(const unsigned char*,const unsigned char*,size_t)>* const Verifier() const { return _verifier.get(); };
 
         /** \brief Return the id of the entity to which this socket is attached
          *
@@ -89,7 +98,8 @@ namespace Sigma {
 	private:
 		mutable std::atomic_uchar _auth_state;
 		const id_t _id;
-		const cryptography::VMAC_StreamHasher _hasher;
+		const std::unique_ptr<std::function<void(unsigned char*,const unsigned char*,size_t)>> _hasher;
+		const std::unique_ptr<std::function<bool(const unsigned char*,const unsigned char*,size_t)>> _verifier;
 		mutable std::mutex _cx_mutex;
 	};
 }

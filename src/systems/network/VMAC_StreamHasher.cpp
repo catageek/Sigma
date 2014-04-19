@@ -16,7 +16,7 @@ namespace Sigma {
 			_hasher.SetKey(_key_ptr, _key_size, MakeParameters(Name::IV(), ConstByteArrayParameter(nonce, _nonce_size, false), false));
 		};
 
-		bool VMAC_StreamHasher::Verify(const byte* digest, const byte* message, int len) const {
+		bool VMAC_StreamHasher::Verify(const byte* digest, const byte* message, size_t len) const {
 			std::vector<byte> nonce(_nonce_size);
 			std::lock_guard<std::mutex> locker(vmac_mutex);
 			++_nonce;
@@ -35,7 +35,7 @@ namespace Sigma {
 			return _hasher.VerifyDigest(digest, message, len);
 		}
 
-		void VMAC_StreamHasher::CalculateDigest(byte* digest, const byte* message, int len) const {
+		void VMAC_StreamHasher::CalculateDigest(byte* digest, const byte* message, size_t len) const {
 			std::vector<byte> nonce(_nonce_size);
 			std::lock_guard<std::mutex> locker(vmac_mutex);
 			++_nonce;

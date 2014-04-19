@@ -4,8 +4,10 @@
 #include <thread>
 #include <condition_variable>
 #include <mutex>
+#include <memory>
 #include <algorithm>
 #include "Sigma.h"
+#include "systems/network/Network.h"
 #include "systems/network/IOPoller.h"
 #include "AtomicQueue.hpp"
 #include "systems/network/Protocol.h"
@@ -23,32 +25,29 @@ namespace Sigma {
 
 	using namespace network;
 
-	extern template bool Frame_req::CheckVMAC<false, false>() const;
-	extern template bool Frame_req::CheckVMAC<false, true>() const;
-	extern template bool Frame_req::CheckVMAC<true, false>() const;
-	extern template bool Frame_req::CheckVMAC<true, true>() const;
-
 	namespace network_packet_handler {
-		extern template void INetworkPacketHandler::Process<NET_MSG,AUTH_INIT, false>();
-		extern template void INetworkPacketHandler::Process<NET_MSG,AUTH_SEND_SALT, true>();
-		extern template void INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE, false>();
-		extern template void INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_REPLY, true>();
-		extern template void INetworkPacketHandler::Process<TEST,TEST, false>();
-		extern template void INetworkPacketHandler::Process<TEST,TEST, true>();
+		extern template void INetworkPacketHandler<SERVER>::Process<NET_MSG,AUTH_INIT>();
+		extern template void INetworkPacketHandler<CLIENT>::Process<NET_MSG,AUTH_SEND_SALT>();
+		extern template void INetworkPacketHandler<SERVER>::Process<NET_MSG,AUTH_KEY_EXCHANGE>();
+		extern template void INetworkPacketHandler<CLIENT>::Process<NET_MSG,AUTH_KEY_REPLY>();
+		extern template void INetworkPacketHandler<SERVER>::Process<TEST,TEST>();
+		extern template void INetworkPacketHandler<CLIENT>::Process<TEST,TEST>();
 	}
 
 	namespace network_packet_handler {
-		class INetworkPacketHandler;
+		template<TagType T> class INetworkPacketHandler;
 	}
 
 	class NetworkSystem {
 	public:
-		friend void Authentication::SetHasher(std::unique_ptr<cryptography::VMAC_StreamHasher>&& hasher);
-		friend void Authentication::SetAuthState(uint32_t state);
+		template<TagType T> friend void Authentication::SetHasher(std::unique_ptr<std::function<void(unsigned char*,const unsigned char*,size_t)>>&& hasher);
+		template<TagType T> friend void Authentication::SetVerifier(std::unique_ptr<std::function<bool(const unsigned char*,const unsigned char*,size_t)>>&& verifier);
+		template<TagType T> friend void Authentication::SetAuthState(uint32_t state);
 		friend int Authentication::SendSalt() const;
 		friend void Authentication::CheckKeyExchange(const std::list<std::shared_ptr<FrameObject>>& req_list);
 		friend void Authentication::CreateSecureKey(const std::list<std::shared_ptr<FrameObject>>& req_list);
 		friend void FrameObject::SendMessage(unsigned char major, unsigned char minor);
+		friend void FrameObject::SendMessage(id_t, unsigned char major, unsigned char minor);
 
 //		extern template	bool CheckVMAC<true,false>(const std::list<std::unique_ptr<FrameObject>>& frames) const;
 //		extern template	bool CheckVMAC<false,false>(const std::list<std::unique_ptr<FrameObject>>& frames) const;
@@ -65,10 +64,10 @@ namespace Sigma {
 		DLL_EXPORT bool Server_Start(const char *ip, unsigned short port);
 		DLL_EXPORT bool Connect(const char *ip, unsigned short port, const std::string& login, const std::string& password);
 
-		template<bool isClient>
+    	template<TagType T>
 		DLL_EXPORT void SetTCPHandler() {
 
-			authentication.Initialize<isClient>(this);
+			authentication.Initialize<T>(this);
 
 			start = chain_t({
 				// Poll the socket and select the next chain to run
@@ -153,121 +152,17 @@ namespace Sigma {
 
 			unauthenticated_recv_data = chain_t({
 				// Get the length
-				std::bind(&NetworkSystem::ReassembleFrame<isClient, false>, this, &pub_rawframe_req, &pub_frame_req),
-				[&](){
-					auto req_list = GetPublicReassembledFrameQueue()->Poll();
-					if (! req_list) {
-						return STOP;
-					}
-//					LOG_DEBUG << "(" << sched_getcpu() << ") got " << req_list->size() << " PublicDispatchReq events";
-					for (auto& req : *req_list) {
-						msg_hdr* header = req->Header();
-						auto major = header->type_major;
-						if (IS_RESTRICTED(major)) {
-							LOG_DEBUG << "restricted";
-							CloseConnection<isClient>(req.get());
-							break;
-						}
-						switch(major) {
-						case NET_MSG:
-							{
-								auto minor = header->type_minor;
-								switch(minor) {
-									case AUTH_INIT:
-										{
-											network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_INIT>()->Push(std::move(req));
-											break;
-										}
-									case AUTH_SEND_SALT:
-										{
-											network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_SEND_SALT>()->Push(std::move(req));
-											break;
-										}
-									case AUTH_KEY_EXCHANGE:
-										{
-											network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_KEY_EXCHANGE>()->Push(std::move(req));
-											break;
-										}
-									case AUTH_KEY_REPLY:
-										{
-											network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_KEY_REPLY>()->Push(std::move(req));
-											break;
-										}
-									default:
-										{
-											LOG_DEBUG << "(" << sched_getcpu() << ") invalid minor code, closing";
-											CloseConnection<isClient>(req.get());
-										}
-								}
-								break;
-							}
-						default:
-							{
-								LOG_DEBUG << "(" << sched_getcpu() << ") invalid major code in unauthenticated chain, packet of " << req->PacketSize() << " bytes, closing";
-								CloseConnection<isClient>(req.get());
-							}
-						}
-					}
-					if(! network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG, AUTH_INIT>()->Empty()) {
-						network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_INIT, isClient>();
-					}
-					if(! network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG, AUTH_SEND_SALT>()->Empty()) {
-						network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_SEND_SALT, isClient>();
-					}
-					if(! network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG, AUTH_KEY_EXCHANGE>()->Empty()) {
-						network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE, isClient>();
-					}
-					if(! network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG, AUTH_KEY_REPLY>()->Empty()) {
-						network_packet_handler::INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_REPLY, isClient>();
-					}
-					return STOP;
-				}
+				std::bind(&NetworkSystem::ReassembleFrame<T, NONE>, this, &pub_rawframe_req, &pub_frame_req),
+                std::bind(&NetworkSystem::UnauthenticatedDispatch<T>, this)
 			});
 
 			authenticated_recv_data = chain_t({
 				// Get the length
-				std::bind(&NetworkSystem::ReassembleFrame<isClient, true>, this, &auth_rawframe_req, &auth_checked_frame_req),
-				[&](){
-					auto req_list = NetworkSystem::GetAuthenticatedCheckedFrameQueue()->Poll();
-					if (! req_list) {
-						return STOP;
-					}
-//					LOG_DEBUG << "(" << sched_getcpu() << ") got " << req_list->size() << " AuthenticatedCheckedDispatchReq events";
-					for (auto& req : *req_list) {
-						msg_hdr* header = req->Header();
-						auto major = header->type_major;
-						switch(major) {
-							// select handlers
-						case TEST:
-							{
-								auto minor = header->type_minor;
-								switch(minor) {
-									case TEST:
-										{
-											network_packet_handler::INetworkPacketHandler::GetQueue<TEST,TEST>()->Push(std::move(req));
-											network_packet_handler::INetworkPacketHandler::Process<TEST,TEST, isClient>();
-											break;
-										}
-									default:
-										{
-											LOG_ERROR << "(" << sched_getcpu() << ") TEST: closing";
-											CloseConnection<isClient>(req.get());
-										}
-								}
-								break;
-							}
-
-						default:
-							{
-								LOG_ERROR << "(" << sched_getcpu() << ") Authenticated switch: closing";
-								CloseConnection<isClient>(req.get());
-							}
-						}
-					}
-					return STOP;
-				}
+				std::bind(&NetworkSystem::ReassembleFrame<T>, this, &auth_rawframe_req, &auth_checked_frame_req),
+                std::bind(&NetworkSystem::AuthenticatedDispatch<T>, this)
 			});
 		}
+		void SetServerPublicKey(std::unique_ptr<std::vector<unsigned char>>&& key) { serverPublicKey = std::move(key); };
 
 	private:
         /** \brief The listener waits for connections and pass new connections to the IncomingConnection
@@ -277,26 +172,41 @@ namespace Sigma {
          */
 		std::unique_ptr<network::TCPConnection> Listener(const char *ip, unsigned short port);
 
-		void SetHasher(std::unique_ptr<cryptography::VMAC_StreamHasher>&& hasher) { this->hasher = std::move(hasher); };
-		cryptography::VMAC_StreamHasher* Hasher() { return hasher.get(); };
+		void SetHasher(std::unique_ptr<std::function<void(unsigned char*,const unsigned char*,size_t)>>&& hasher) { this->hasher = std::move(hasher); };
+
+		std::function<void(unsigned char*,const unsigned char*,size_t)>* Hasher() { return hasher.get(); };
+
+		void SetVerifier(std::unique_ptr<std::function<bool(const unsigned char*,const unsigned char*,size_t)>>&& verifier) { this->verifier = std::move(verifier); };
+
+		std::function<bool(const unsigned char*,const unsigned char*,size_t)>* Verifier() { return verifier.get(); };
 
 		void SetAuthState(uint32_t state) const { auth_state.store(state); };
 		uint32_t AuthState() const { return auth_state.load(); };
 
-		const AtomicQueue<std::unique_ptr<Frame_req>>* const GetAuthenticatedRawFrameReqQueue() { return &auth_rawframe_req; };
-		const AtomicQueue<std::unique_ptr<FrameObject>>* const GetAuthenticatedCheckedFrameQueue() { return &auth_checked_frame_req; };
+		const AtomicQueue<std::unique_ptr<Frame_req>>* const GetAuthenticatedRawFrameReqQueue() const { return &auth_rawframe_req; };
+		const AtomicQueue<std::unique_ptr<FrameObject>>* const GetAuthenticatedCheckedFrameQueue() const { return &auth_checked_frame_req; };
 		const AtomicQueue<std::unique_ptr<Frame_req>>* const GetPublicRawFrameReqQueue() const { return &pub_rawframe_req; };
-		const AtomicQueue<std::unique_ptr<FrameObject>>* const GetPublicReassembledFrameQueue() { return &pub_frame_req; };
+		const AtomicQueue<std::unique_ptr<FrameObject>>* const GetPublicReassembledFrameQueue() const { return &pub_frame_req; };
 
 		const IOPoller* const Poller() { return &poller; };
 
 		// specialization in network.cpp
-		template<bool isClient>
+    	template<TagType T>
 		void CloseConnection(const FrameObject* frame) const;
+
+		// specialization in network.cpp
+    	template<TagType T>
+        int UnauthenticatedDispatch() const;
+
+		// specialization in network.cpp
+    	template<TagType T>
+        int AuthenticatedDispatch() const;
 
 		void RemoveClientConnection() const;
 		void CloseConnection(const int fd, const ConnectionData* cx_data) const;
 		void RemoveConnection(const int fd) const;
+
+		const std::vector<unsigned char>* ServerPublicKey() const { return serverPublicKey.get(); };
 
 		int ssocket;											// the listening socket
 		mutable IOPoller poller;
@@ -311,22 +221,24 @@ namespace Sigma {
 		const AtomicQueue<std::unique_ptr<Frame_req>> pub_rawframe_req;				// raw frame requests
 		const AtomicQueue<std::unique_ptr<FrameObject>> pub_frame_req;				// reassembled frame request
 
+        std::unique_ptr<std::vector<unsigned char>> serverPublicKey;
+		std::unique_ptr<std::function<bool(const unsigned char*,const unsigned char*,size_t)>> verifier;
 		// members for client only
-		std::unique_ptr<cryptography::VMAC_StreamHasher> hasher;
+		std::unique_ptr<std::function<void(unsigned char*,const unsigned char*,size_t)>> hasher;
 		mutable std::atomic_uint_least32_t auth_state;
 		network::TCPConnection cnx;
 		mutable std::condition_variable is_connected;
 		std::mutex connecting;
 
-		template<bool isClient, bool hasVMAC>
+		template<TagType T, TagType checkAuth = T>
 		int ReassembleFrame(const AtomicQueue<std::unique_ptr<Frame_req>>* const input, const AtomicQueue<std::unique_ptr<FrameObject>>* const output) const {
 			auto req_list = input->Poll();
-			if (! req_list) {
+			if (req_list.empty()) {
 				return STOP;
 			}
 			auto ret = CONTINUE;
 //			LOG_DEBUG << "(" << sched_getcpu() << ") got " << req_list->size() << " Reassemble events";
-			for (auto& req : *req_list) {
+			for (auto& req : req_list) {
 				auto target_size = req->length_requested;
 //				LOG_DEBUG << "(" << sched_getcpu() << ")  Reassembling " << target_size << " bytes";
 				auto frame = req->reassembled_frames_list.back().get();
@@ -343,7 +255,7 @@ namespace Sigma {
 
 				if (len > 65535) {
 					LOG_DEBUG << "(" << sched_getcpu() << ") Packet length exceeding 65535 bytes. closing";
-					CloseConnection<isClient>(frame);
+					CloseConnection<T>(frame);
 					continue;
 				}
 				current_size += len;
@@ -355,7 +267,7 @@ namespace Sigma {
 					target_size = frame->FullFrame()->length + sizeof(Frame_hdr);
 //					LOG_DEBUG << "(" << sched_getcpu() << ")  Completing message to " << target_size << " bytes in a frame of " << req->length_total << " bytes";
 					req->length_requested = target_size;
-					frame->Resize<false>(length - sizeof(msg_hdr));
+					frame->Resize<NONE>(length - sizeof(msg_hdr));
 					buffer = reinterpret_cast<char*>(frame->FullFrame());
 					len = TCPConnection(req->fd, NETA_IPv4, SCS_CONNECTED).Recv(reinterpret_cast<char*>(buffer) + current_size, target_size - current_size);
 					if (len < 0) {
@@ -371,7 +283,7 @@ namespace Sigma {
 					if (req->HasExpired()) {
 						// Frame reassembly is stopped after 3 seconds if message is uncomplete
 						LOG_DEBUG << "(" << sched_getcpu() << ") Dropping all frames and closing (timeout)";
-						CloseConnection<isClient>(frame);
+						CloseConnection<T>(frame);
 						continue;
 					}
 					// we put again the request in the queue
@@ -400,9 +312,9 @@ namespace Sigma {
 					else {
 						// request completed
 						// check integrity
-						if (! req->CheckVMAC<isClient, hasVMAC>()) {
+						if (! req->CheckVMAC<checkAuth>()) {
 							LOG_DEBUG << "(" << sched_getcpu() << ") Dropping all frames and closing (VMAC check failed)";
-							CloseConnection<isClient>(frame);
+							CloseConnection<T>(frame);
 							continue;
 						}
 						// We allow again events on this socket

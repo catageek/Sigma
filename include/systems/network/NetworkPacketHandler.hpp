@@ -3,6 +3,7 @@
 
 #include "AtomicQueue.hpp"
 #include "Log.h"
+#include "systems/network/Network.h"
 
 namespace Sigma {
 
@@ -10,24 +11,25 @@ namespace Sigma {
 
 	namespace network_packet_handler {
 
-		template<int Major,int Minor>
+		template<int Major,int Minor, TagType T>
 		class PacketQueue {
 		public:
 			static AtomicQueue<std::shared_ptr<FrameObject>> input_queue;
 		};
 
-		template<int Major,int Minor>
-		AtomicQueue<std::shared_ptr<FrameObject>> PacketQueue<Major,Minor>::input_queue;
+		template<int Major,int Minor, TagType T>
+		AtomicQueue<std::shared_ptr<FrameObject>> PacketQueue<Major,Minor, T>::input_queue;
 
+        template<TagType T>
 		class INetworkPacketHandler {
 		public:
-			template<int Major, int Minor, bool isClient>
+			template<int Major, int Minor>
 			static void Process() {
 				LOG_DEBUG << "parent process here...";
 			};
 
 			template<int Major, int Minor>
-			static const AtomicQueue<std::shared_ptr<FrameObject>>* const GetQueue() { return &PacketQueue<Major,Minor>::input_queue; };
+			static const AtomicQueue<std::shared_ptr<FrameObject>>* const GetQueue() { return &PacketQueue<Major,Minor, T>::input_queue; };
 
 		};
 	} // namespace network_packet_handler

@@ -78,6 +78,8 @@ namespace Sigma {
          */
 		static void PBKDF(byte* derived, const byte* password, size_t password_len, const byte* salt, size_t salt_len);
 
+		static AutoSeededRandomPool& RNG() { return _prng; };
+
 	private:
 
 /*		DH _dh;

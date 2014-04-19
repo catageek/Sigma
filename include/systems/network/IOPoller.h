@@ -136,7 +136,7 @@ namespace Sigma {
 		}
 	}
 
-	inline void IOPoller::Watch(int fd) const {
+	inline void IOPoller::Watch(const int fd) const {
 		IOEvent e(fd, EVFILT_READ, EV_ENABLE);
 //		LOG_DEBUG << "Watching...";
 		auto i = kevent(kqhandle, e.getStruct(), 1, NULL, 0, NULL);

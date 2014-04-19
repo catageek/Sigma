@@ -2,7 +2,9 @@
 #include "systems/network/NetworkSystem.h"
 #include <cstring>
 #include "systems/network/ConnectionData.h"
+#include "systems/network/ProtocolTemplates.h"
 #include "composites/NetworkNode.h"
+#include "systems/network/VMAC_StreamHasher.h"
 #include "crypto++/vmac.h"
 
 namespace Sigma {
@@ -12,30 +14,26 @@ namespace Sigma {
 	std::string Authentication::password;
 	std::vector<byte> Authentication::secret_key(16);
 
-	extern template void NetworkSystem::CloseConnection<true>(const FrameObject* frame) const;
-	extern template	void NetworkSystem::CloseConnection<false>(const FrameObject* frame) const;
+	extern template void NetworkSystem::CloseConnection<CLIENT>(const FrameObject* frame) const;
+	extern template	void NetworkSystem::CloseConnection<SERVER>(const FrameObject* frame) const;
 
 	template<>
-	NetworkSystem* const Authentication::GetNetworkSystem<true>() { return netsystem_client; };
+	NetworkSystem* const Authentication::GetNetworkSystem<CLIENT>() { return netsystem_client; };
 
 	template<>
-	void Authentication::SetSystem<true>(NetworkSystem* system) { netsystem_client = system; };
+	void Authentication::SetSystem<CLIENT>(NetworkSystem* system) { netsystem_client = system; };
 
-	void Authentication::SetHasher(std::unique_ptr<cryptography::VMAC_StreamHasher>&& hasher) {
-		GetNetworkSystem()->SetHasher(std::move(hasher));
-	}
-
-	void Authentication::SetAuthState(uint32_t state) { GetNetworkSystem()->SetAuthState(state); }
-
+	template<>
+	void Authentication::SetSystem<SERVER>(NetworkSystem* system) { netsystem = system; };
 
 	int Authentication::RetrieveSalt() const {
-		auto req_list = network_packet_handler::INetworkPacketHandler::GetQueue<NET_MSG,AUTH_INIT>()->Poll();
-		if (!req_list) {
+		auto req_list = network_packet_handler::INetworkPacketHandler<SERVER>::GetQueue<NET_MSG,AUTH_INIT>()->Poll();
+		if (req_list.empty()) {
 			return STOP;
 		}
-		for(auto& req : *req_list) {
+		for(auto& req : req_list) {
 			auto reply = std::make_shared<FrameObject>(req->FileDescriptor());
-			reply->Resize<false>(sizeof(SendSaltPacket));
+			reply->Resize<NONE>(sizeof(SendSaltPacket));
 			// TODO : salt is hardcoded !!!
 			auto login = req->Content<AuthInitPacket>()->login;
 			// GetSaltFromsomewhere(reply->Body(), packet->login);
@@ -50,10 +48,10 @@ namespace Sigma {
 
 	int Authentication::SendSalt() const {
 		auto req_list = salt_retrieved.Poll();
-		if (!req_list) {
+		if (req_list.empty()) {
 			return STOP;
 		}
-		for(auto& req : *req_list) {
+		for(auto& req : req_list) {
 			auto reply = req->FullFrame();
 			if (reply) {
 				// send salt
@@ -64,7 +62,7 @@ namespace Sigma {
 				// TODO: send error message
 				//TCPConnection(req->fd, NETA_IPv4, SCS_CONNECTED).Send(reinterpret_cast<char*>(challenge.get()), sizeof(*challenge));
 				LOG_DEBUG << "User unknown";
-				netsystem->CloseConnection<false>(req.get());
+				netsystem->CloseConnection<SERVER>(req.get());
 			}
 		}
 		return CONTINUE;
@@ -76,7 +74,7 @@ namespace Sigma {
 			if(! req->CxData()->CompareAuthState(AUTH_KEY_EXCHANGE)) {
 				// This is not the packet expected
 				LOG_ERROR << "(" << sched_getcpu() << ") Unexpected packet received with length = " << req->FullFrame()->length << ", closing...";
-				Authentication::GetNetworkSystem()->CloseConnection<false>(req.get());
+				Authentication::GetNetworkSystem<SERVER>()->CloseConnection<SERVER>(req.get());
 				continue;
 			}
 			// Derive password and salt to get key
@@ -90,20 +88,25 @@ namespace Sigma {
 			if(! recv_packet->VerifyVMAC(key)) {
 				LOG_DEBUG << "Bad password, closing...";
 				req->CxData()->SetAuthState(AUTH_NONE);
-				Authentication::GetNetworkSystem()->CloseConnection<false>(req.get());
+				Authentication::GetNetworkSystem<SERVER>()->CloseConnection<SERVER>(req.get());
 				continue;
 			}
 			auto checker_key = recv_packet->VMAC_BuildHasher(key);
 			// TODO: Hard coded entity #id
-			auto cx_data = new ConnectionData(1, std::move(checker_key), recv_packet->nonce2, 8);
+			auto authentifier = std::make_shared<cryptography::VMAC_StreamHasher>(std::move(checker_key), recv_packet->nonce2, 8);
+			auto cx_data = new ConnectionData(1, authentifier->Hasher(), authentifier->Verifier());
 			auto reply_packet = std::make_shared<FrameObject>();
-			reply_packet->Content<KeyReplyPacket>()->Compute(recv_packet->nonce2, cx_data->Hasher());
+    		*reply_packet << *Authentication::GetNetworkSystem<SERVER>()->ServerPublicKey();
+    		std::vector<unsigned char> vmac(8);
+	    	(*cx_data->Hasher())(vmac.data(), reply_packet->Content<KeyReplyPacket, unsigned char>(), Authentication::GetNetworkSystem<SERVER>()->ServerPublicKey()->size());
+	    	*reply_packet << vmac;
+//			reply_packet->Content<KeyReplyPacket>()->Compute(recv_packet->nonce2, cx_data->Hasher());
 
 			LOG_DEBUG << "(" << sched_getcpu() << ") Authentication OK";
 			cx_data->SetAuthState(AUTH_SHARE_KEY);
 			// TODO: Hardcoded entity
 			NetworkNode::AddEntity(1, network::TCPConnection(req->fd, network::NETA_IPv4, network::SCS_CONNECTED));
-			Authentication::GetNetworkSystem()->Poller()->Create(req->FileDescriptor(), reinterpret_cast<void*>(cx_data));
+			Authentication::GetNetworkSystem<SERVER>()->Poller()->Create(req->FileDescriptor(), reinterpret_cast<void*>(cx_data));
 			reply_packet->SendMessageNoVMAC(req->fd, NET_MSG, AUTH_KEY_REPLY);
 		}
 	}
@@ -112,18 +115,22 @@ namespace Sigma {
 		// client side
 		for(auto& req : req_list) {
 			// We received reply
-			auto body = req->Content<KeyReplyPacket>();
-			if (body->VerifyVMAC(Authentication::GetNetworkSystem()->Hasher())) {
+			auto body = req->Content<KeyReplyPacket,unsigned char>();
+			auto v = Authentication::GetNetworkSystem<CLIENT>()->Verifier();
+			if ((*v)(body + PUBLIC_KEY_SIZE, body, PUBLIC_KEY_SIZE)) {
+                auto key = make_unique<std::vector<unsigned char>>(PUBLIC_KEY_SIZE);
+                std::memcpy(key->data(), body, PUBLIC_KEY_SIZE);
+                Authentication::GetNetworkSystem<CLIENT>()->SetServerPublicKey(std::move(key));
 				req->CxData()->SetAuthState(AUTH_SHARE_KEY);
-				SetAuthState(AUTH_SHARE_KEY);
+				SetAuthState<CLIENT>(AUTH_SHARE_KEY);
 				LOG_DEBUG << "(" << sched_getcpu() << ") Authentication OK";
-				Authentication::GetNetworkSystem()->is_connected.notify_all();
+				Authentication::GetNetworkSystem<CLIENT>()->is_connected.notify_all();
 			}
 			else {
 				LOG_DEBUG << "(" << sched_getcpu() << ") Authentication failed";
-				SetAuthState(AUTH_NONE);
-				Authentication::GetNetworkSystem()->CloseConnection<true>(req.get());
-				Authentication::GetNetworkSystem()->is_connected.notify_all();
+				SetAuthState<CLIENT>(AUTH_NONE);
+				Authentication::GetNetworkSystem<CLIENT>()->CloseConnection<CLIENT>(req.get());
+				Authentication::GetNetworkSystem<CLIENT>()->is_connected.notify_all();
 			}
 		}
 	}
@@ -165,32 +172,26 @@ namespace Sigma {
 		return std::move(checker_key);
 	}
 
-	std::unique_ptr<cryptography::VMAC_StreamHasher> KeyExchangePacket::VMAC_getHasher(std::unique_ptr<std::vector<byte>>& key) const {
-		return std::unique_ptr<cryptography::VMAC_StreamHasher>(new cryptography::VMAC_StreamHasher(std::move(key), nonce2, 8));
-	}
-
 	void KeyReplyPacket::Compute(const byte* m, const cryptography::VMAC_StreamHasher* hasher) {
 		std::memcpy(challenge, m, NONCE2_SIZE);
 		hasher->CalculateDigest(vmac, challenge, NONCE2_SIZE);
 	}
 
-	bool KeyReplyPacket::VerifyVMAC(cryptography::VMAC_StreamHasher* hasher) const {
-		return hasher->Verify(vmac, challenge, NONCE2_SIZE);
-	}
-
 	namespace network_packet_handler {
 		template<>
-		void INetworkPacketHandler::Process<NET_MSG,AUTH_INIT, false>() {
+		template<>
+		void INetworkPacketHandler<SERVER>::Process<NET_MSG,AUTH_INIT>() {
 			ThreadPool::Execute(std::make_shared<TaskReq<chain_t>>(Authentication::GetAuthInitHandler()));
 		}
 
 		template<>
-		void INetworkPacketHandler::Process<NET_MSG,AUTH_SEND_SALT, true>() {
+		template<>
+		void INetworkPacketHandler<CLIENT>::Process<NET_MSG,AUTH_SEND_SALT>() {
 			auto req_list = GetQueue<NET_MSG,AUTH_SEND_SALT>()->Poll();
-			if (!req_list) {
+			if (req_list.empty()) {
 				return;
 			}
-			for(auto& req : *req_list) {
+			for(auto& req : req_list) {
 				// We must send keys
 				auto body = req->Content<SendSaltPacket>();
 				LOG_DEBUG << "(" << sched_getcpu() << ") salt received : " << std::string(reinterpret_cast<const char*>(body->salt), 8);
@@ -198,31 +199,35 @@ namespace Sigma {
 				auto frame = body->GetKeyExchangePacket();
 				auto packet = frame->Content<KeyExchangePacket>();
 				// TODO !!!!!
-				auto hasher_key = packet->VMAC_BuildHasher();
+				auto hasher_key = std::move(packet->VMAC_BuildHasher());
 //				LOG_DEBUG << "(" << sched_getcpu() << ") Sending keys : " << frame->PacketSize() << " bytes, key is " << std::hex << (uint64_t) hasher_key->data();
-				Authentication::SetHasher(packet->VMAC_getHasher(hasher_key));
-				Authentication::SetAuthState(AUTH_KEY_EXCHANGE);
+				auto authentifier = std::make_shared<cryptography::VMAC_StreamHasher>(std::move(hasher_key), packet->nonce2, 8);
+				Authentication::SetHasher<CLIENT>(authentifier->Hasher());
+				Authentication::SetVerifier<CLIENT>(authentifier->Verifier());
+				Authentication::SetAuthState<CLIENT>(AUTH_KEY_EXCHANGE);
 				req->CxData()->SetAuthState(AUTH_KEY_EXCHANGE);
 				frame->SendMessageNoVMAC(req->fd, NET_MSG, AUTH_KEY_EXCHANGE);
 			}
 		}
 
 		template<>
-		void INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE, false>() {
+		template<>
+		void INetworkPacketHandler<SERVER>::Process<NET_MSG,AUTH_KEY_EXCHANGE>() {
 			auto req_list = GetQueue<NET_MSG,AUTH_KEY_EXCHANGE>()->Poll();
-			if (!req_list) {
+			if (req_list.empty()) {
 				return;
 			}
-			Authentication::CheckKeyExchange(*req_list);
+			Authentication::CheckKeyExchange(req_list);
 		}
 
 		template<>
-		void INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_REPLY, true>() {
+		template<>
+		void INetworkPacketHandler<CLIENT>::Process<NET_MSG,AUTH_KEY_REPLY>() {
 			auto req_list = GetQueue<NET_MSG,AUTH_KEY_REPLY>()->Poll();
-			if (!req_list) {
+			if (req_list.empty()) {
 				return;
 			}
-			Authentication::CreateSecureKey(*req_list);
+			Authentication::CreateSecureKey(req_list);
 		}
 	}
 

@@ -15,6 +15,7 @@
 #define ALEA_SIZE			16
 #define NONCE2_SIZE			16
 #define	NONCE_SIZE			8
+#define PUBLIC_KEY_SIZE     32
 #define VMAC_MSG_SIZE		(ALEA_SIZE + NONCE2_SIZE + NONCE_SIZE)
 
 #define AUTH_NONE			0
@@ -46,7 +47,6 @@ namespace Sigma {
 
 	struct KeyReplyPacket {
 		friend KeyExchangePacket;
-		bool VerifyVMAC(cryptography::VMAC_StreamHasher* hasher) const;
 		void Compute(const byte* m, const cryptography::VMAC_StreamHasher* const hasher);
 	private:
 		byte challenge[NONCE2_SIZE];
@@ -60,7 +60,6 @@ namespace Sigma {
 		byte nonce[NONCE_SIZE];								// a random number used as nonce for the VMAC of this packet
 		byte vmac[VMAC_SIZE];								// VMAC of the message using nonce and shared secret
 
-		std::unique_ptr<cryptography::VMAC_StreamHasher> VMAC_getHasher(std::unique_ptr<std::vector<byte>>& key) const;
 		std::unique_ptr<std::vector<byte>> VMAC_BuildHasher(const byte* key) const;
 		std::unique_ptr<std::vector<byte>> VMAC_BuildHasher() const;
 		bool VerifyVMAC(const byte* key) const;
@@ -73,9 +72,9 @@ namespace Sigma {
 	public:
 		Authentication() {};
 
-		template<bool isClient>
+		template<TagType T>
 		void Initialize(NetworkSystem* netsystem) const {
-			Authentication::SetSystem<isClient>(netsystem);
+			SetSystem<T>(netsystem);
 			auto f = chain_t({
 				std::bind(&Sigma::Authentication::RetrieveSalt, this),
 				std::bind(&Sigma::Authentication::SendSalt, this)
@@ -85,12 +84,22 @@ namespace Sigma {
 
 		static void SetPassword(const std::string& password) { Authentication::password = password; };
 
-		template<bool isClient = false>
+		template<TagType T>
 		static NetworkSystem* const GetNetworkSystem() { return netsystem; };
 
-		static void SetHasher(std::unique_ptr<cryptography::VMAC_StreamHasher>&& hasher);
+		template<TagType T>
+		static void SetHasher(std::unique_ptr<std::function<void(unsigned char*,const unsigned char*,size_t)>>&& hasher) {
+		    GetNetworkSystem<T>()->SetHasher(std::move(hasher));
+	    };
 
-		static void SetAuthState(uint32_t state);
+		template<TagType T>
+		static void SetVerifier(std::unique_ptr<std::function<bool(const unsigned char*,const unsigned char*,size_t)>>&& verifier) {
+		    GetNetworkSystem<T>()->SetVerifier(std::move(verifier));
+	    };
+
+		template<TagType T>
+		static void SetAuthState(uint32_t state) { GetNetworkSystem<T>()->SetAuthState(state); };
+
 		static void CheckKeyExchange(const std::list<std::shared_ptr<FrameObject>>& req_list);
 		static void CreateSecureKey(const std::list<std::shared_ptr<FrameObject>>& req_list);
 		static std::shared_ptr<chain_t> GetAuthInitHandler() { return auth_init_handler; };
@@ -103,8 +112,8 @@ namespace Sigma {
 
 		static unsigned char* GetSecretKey() { return secret_key.data(); };
 
-		template<bool isClient>
-		static void SetSystem(NetworkSystem* system) { netsystem = system; };
+		template<TagType T>
+		static void SetSystem(NetworkSystem* system);
 
 		static NetworkSystem* netsystem;
 		static NetworkSystem* netsystem_client;
@@ -128,16 +137,20 @@ namespace Sigma {
 
 	namespace network_packet_handler {
 		template<>
-		void INetworkPacketHandler::Process<NET_MSG,AUTH_INIT, false>();
+		template<>
+		void INetworkPacketHandler<SERVER>::Process<NET_MSG,AUTH_INIT>();
 
 		template<>
-		void INetworkPacketHandler::Process<NET_MSG,AUTH_SEND_SALT, true>();
+		template<>
+		void INetworkPacketHandler<CLIENT>::Process<NET_MSG,AUTH_SEND_SALT>();
 
 		template<>
-		void INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_EXCHANGE, false>();
+		template<>
+		void INetworkPacketHandler<SERVER>::Process<NET_MSG,AUTH_KEY_EXCHANGE>();
 
 		template<>
-		void INetworkPacketHandler::Process<NET_MSG,AUTH_KEY_REPLY, true>();
+		template<>
+		void INetworkPacketHandler<CLIENT>::Process<NET_MSG,AUTH_KEY_REPLY>();
 	}
 }
 

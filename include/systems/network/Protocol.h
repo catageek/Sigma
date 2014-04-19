@@ -9,6 +9,8 @@
 
 // size of the VMAc tag
 #define VMAC_SIZE			8
+// size of the ESIGN tag
+#define ESIGN_SIZE          24
 
 // flags
 #define	HAS_VMAC_TAG		0
@@ -37,11 +39,8 @@
 #define IS_RESTRICTED(x)	((x >> 3) != 0)
 
 namespace Sigma {
-	class ConnectionData;
 
-	namespace cryptography {
-		class VMAC_StreamHasher;
-	}
+	class ConnectionData;
 
     /** \brief The header of the message, without the preceding length
      */
@@ -68,7 +67,7 @@ namespace Sigma {
 	class FrameObject {
 	public:
 		friend class Authentication;
-		template<int Major,int Minor,bool isClient> friend void network_packet_handler::INetworkPacketHandler::Process();
+		template<TagType U> template<int Major,int Minor> friend void network_packet_handler::INetworkPacketHandler<U>::Process();
 		friend class NetworkSystem;
 		friend class Frame_req;
 
@@ -79,8 +78,8 @@ namespace Sigma {
          * \param cxdata_ptr const ConnectionData* const the object storing data about the connection
          *
          */
-		template<class T=Frame>
-		FrameObject(const int fd = -1, const ConnectionData* const cx_data = nullptr) : cx_data(cx_data), fd(fd), packet_size(sizeof(T)), data(std::vector<char>(sizeof(T) + VMAC_SIZE)){};
+		template<class U=Frame>
+		FrameObject(const int fd = -1, const ConnectionData* const cx_data = nullptr) : cx_data(cx_data), fd(fd), packet_size(sizeof(U)), data(std::vector<char>(sizeof(U) + ESIGN_SIZE)){};
 
 		virtual ~FrameObject() {};
 
@@ -88,9 +87,9 @@ namespace Sigma {
 		FrameObject(FrameObject&) = delete;
 		FrameObject& operator=(FrameObject&) = delete;
 
-		template<class T>
-		FrameObject& operator<<(const T& in) {
-			append(&in, sizeof(T));
+		template<class U>
+		FrameObject& operator<<(const U& in) {
+			append(&in, sizeof(U));
 			return *this;
 		}
 
@@ -118,11 +117,8 @@ namespace Sigma {
          * \param new_size size_t the new size
          *
          */
-		template<bool WITH_VMAC=true>
-		void Resize(size_t new_size) {
-			packet_size = new_size + sizeof(Frame);
-			data.resize(packet_size + VMAC_SIZE);
-		};
+		template<TagType tag=SERVER>
+		void Resize(size_t new_size);
 
         /** \brief Maps the body of the message to the structure of the packet of type T
          *
@@ -131,10 +127,10 @@ namespace Sigma {
          * \return U* pointer to the packet T
          *
          */
-		template<class T, class U=T>
+		template<class V, class U=V>
 		U* Content() {
-			if(packet_size < sizeof(T) + sizeof(Frame)) {
-				Resize(sizeof(T));
+			if(packet_size < sizeof(V) + sizeof(Frame)) {
+				Resize(sizeof(V));
 			}
 			return reinterpret_cast<U*>(Body());
 		}
@@ -181,7 +177,7 @@ namespace Sigma {
 		const ConnectionData* CxData() const { return cx_data; };
 		int FileDescriptor() const { return fd; };
 
-		void SendMessage(int fd, unsigned char major, unsigned char minor, cryptography::VMAC_StreamHasher* hasher);
+		void SendMessage(int fd, unsigned char major, unsigned char minor, const std::function<void(unsigned char*,const unsigned char*,size_t)>* hasher);
 		void SendMessageNoVMAC(int fd, unsigned char major, unsigned char minor);
 
 		void append(const void* in, std::size_t sizeBytes);
@@ -192,11 +188,9 @@ namespace Sigma {
 		const int fd;
 	};
 
-	template<>
-	void FrameObject::Resize<false>(size_t new_size);
-
-	template<>
-	FrameObject& FrameObject::operator<<(const std::string& in);
+    // Declare specialized template functions.
+	template<> FrameObject& FrameObject::operator<<(const std::string& in);
+	template<> FrameObject& FrameObject::operator<<(const std::vector<unsigned char>& in);
 }
 
 #endif // PROTOCOL_H_INCLUDED

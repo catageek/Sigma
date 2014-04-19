@@ -10,8 +10,8 @@
 using namespace network;
 
 namespace Sigma {
-	extern template void NetworkSystem::CloseConnection<true>(const FrameObject* frame) const;
-	extern template	void NetworkSystem::CloseConnection<false>(const FrameObject* frame) const;
+	extern template void NetworkSystem::CloseConnection<CLIENT>(const FrameObject* frame) const;
+	extern template	void NetworkSystem::CloseConnection<SERVER>(const FrameObject* frame) const;
 
 	NetworkSystem::NetworkSystem() throw (std::runtime_error) {
 		if (! poller.Initialize()) {
